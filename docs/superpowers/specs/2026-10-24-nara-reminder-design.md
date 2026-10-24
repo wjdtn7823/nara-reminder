@@ -244,8 +244,9 @@ CREATE TABLE job_state (
 
 공식 명세에 예시값이 없어 실제 서비스키로 호출해 확정하고, 응답을 테스트 fixture로 저장한다.
 
-- `inqryDiv` 값 (등록일시 기준 조회 코드, `1`로 가정)
-- 날짜 파라미터·응답 형식 (`yyyyMMddHHmm` / `yyyy-MM-dd HH:mm:ss`로 가정)
-- 최초 공고의 `bidNtceOrd` 표기 (`"000"`으로 가정 → 정수값 > 0이면 정정)
-- `numOfRows` 최대값 (100으로 사용)
-- 데이터가 없을 때 `items`의 형태 (빈 문자열 / 빈 배열 / 결과코드 `03`)
+- `inqryDiv` 값 (등록일시 기준 조회 코드, `1`로 가정) → 확인: `1` = 등록일시 기준. 정정공고도 새 차수의 `rgstDt`로 조회된다
+- 날짜 파라미터·응답 형식 (`yyyyMMddHHmm` / `yyyy-MM-dd HH:mm:ss`로 가정) → 확인: 가정과 같음. `bidClseDt`는 빈 문자열인 경우가 많다
+- 최초 공고의 `bidNtceOrd` 표기 (`"000"`으로 가정 → 정수값 > 0이면 정정) → 확인: 최초 `000`, 변경공고 `001`
+- `numOfRows` 최대값 (100으로 사용) → 확인: 1000도 오류 없이 수락. 100 유지
+- 데이터가 없을 때 `items`의 형태 (빈 문자열 / 빈 배열 / 결과코드 `03`) → 확인: 결과코드 `00` + `items: []` + `totalCount: 0`. `items`는 배열, `totalCount`는 숫자
+- 추가 확인: 오류 응답은 `response` 키 없이 두 가지 JSON 형태로 온다. 인증 오류 `{"OpenAPI_ServiceResponse":{"cmmMsgHeader":{"returnReasonCode":"30",...}}}`, 파라미터 오류 `{"nkoneps.com.response.ResponseError":{"header":{"resultCode":"08",...}}}`. 둘 다 재시도 없이 실패 처리한다

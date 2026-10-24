@@ -28,7 +28,7 @@
 ## Review Focus
 
 1. **서비스키에 `+`, `/`, `=`가 포함된 경우** — 쿼리에 그대로 넣으면 서버가 `+`를 공백으로 해석해 인증 실패한다. 디코딩 키를 URI 변수로 넘겨 `%2B %2F %3D`로 엄격 인코딩돼야 한다. → Task 4 `서비스키는 엄격하게 인코딩된다`
-2. **HTTP 200인데 본문이 XML 에러(`SERVICE_KEY_IS_NOT_REGISTERED_ERROR` 등)인 경우** — JSON 파싱 예외로 뭉개지지 않고 원문 일부를 담은 비재시도 실패로 처리돼야 한다. → Task 4 `JSON이 아닌 응답은 재시도 없이 실패한다`
+2. **HTTP 200인데 본문이 `response` 키 없는 오류 JSON(`OpenAPI_ServiceResponse` — 실측 확인) 또는 XML인 경우** — 파싱 예외로 뭉개지지 않고 원문 일부를 담은 비재시도 실패로 처리돼야 한다. → Task 4 `response 키가 없는 인증 오류 JSON은 재시도 없이 실패한다`, `JSON이 아닌 응답은 재시도 없이 실패한다`
 3. **공고명에 `&`, `<` 같은 HTML 특수문자가 있는 경우** — 메일 HTML이 깨지거나 태그가 주입되면 안 된다. → Task 6 `공고명은 HTML 이스케이프된다`
 4. **한 항목의 가격/날짜가 빈 문자열·소수 표기·이상 형식인 경우** — 그 항목 하나 때문에 업무구분 전체가 매 배치 실패(영구 장애)하면 안 되고, 필드만 `null`로 처리돼야 한다. → Task 4 `빈 값과 소수 가격과 이상한 날짜를 관대하게 매핑한다`
 5. **같은 실행에서 동일 공고가 두 번 조회되는 경우** (페이지 경계에서 신규 등록으로 항목이 밀림) — 메일에 한 번만 나와야 한다. → Task 7 `같은 실행에서 중복 조회된 공고는 한 번만 보낸다`
@@ -982,6 +982,18 @@ class NaraApiClientTest {
     }
 
     @Test
+    fun `response 키가 없는 인증 오류 JSON은 재시도 없이 실패한다`() {
+        server.enqueue(
+            json("""{"OpenAPI_ServiceResponse":{"cmmMsgHeader":{"errMsg":"SERVICE_KEY_IS_NOT_REGISTERED_ERROR","returnReasonCode":"30"}}}"""),
+        )
+
+        assertThatThrownBy { runBlocking { client().fetch(NoticeSource.BID, NoticeCategory.SERVICE, from, to) } }
+            .isInstanceOf(NaraApiException::class.java)
+            .hasMessageContaining("SERVICE_KEY_IS_NOT_REGISTERED_ERROR")
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
     fun `5xx는 재시도 후 성공하면 결과를 돌려준다`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(503))
         server.enqueue(json(page(1, "N1")))
@@ -1160,12 +1172,12 @@ class NaraApiClient(
         return parsePage(body)
     }
 
-    // 공공데이터포털은 인증·트래픽 오류를 HTTP 200 + XML 또는 비정상 결과코드로 돌려준다
+    // 공공데이터포털은 인증·파라미터 오류를 HTTP 200 + response 키가 없는 별도 JSON(또는 XML)으로 돌려준다
     private fun parsePage(body: String): Page {
         val response = runCatching { objectMapper.readTree(body) }.getOrNull()
             ?.path("response")
             ?.takeUnless { it.isMissingNode }
-            ?: throw NaraApiException("JSON이 아닌 응답: ${body.take(300)}", retryable = false)
+            ?: throw NaraApiException("비정상 응답: ${body.take(300)}", retryable = false)
 
         val header = response.path("header")
         when (val code = header.path("resultCode").asText()) {
@@ -1199,7 +1211,7 @@ class NaraApiClient(
 - [ ] **Step 8: 통과 확인**
 
 Run: `./gradlew test --tests 'com.narareminder.client.*' --tests 'com.narareminder.support.*'`
-Expected: PASS (13 tests)
+Expected: PASS (14 tests)
 
 - [ ] **Step 9: 커밋**
 
@@ -2161,7 +2173,7 @@ class NoticePipeline(
 - [ ] **Step 8: 통과 확인**
 
 Run: `./gradlew test --tests 'com.narareminder.job.*'`
-Expected: PASS (13 tests)
+Expected: PASS (14 tests)
 
 - [ ] **Step 9: 커밋**
 
@@ -2295,7 +2307,7 @@ class NoticeJobs(private val pipeline: NoticePipeline) {
 - [ ] **Step 4: 전체 테스트 통과 확인**
 
 Run: `./gradlew test`
-Expected: PASS (전체 52 tests, 실패 0)
+Expected: PASS (전체 53 tests, 실패 0)
 
 - [ ] **Step 5: 커밋**
 

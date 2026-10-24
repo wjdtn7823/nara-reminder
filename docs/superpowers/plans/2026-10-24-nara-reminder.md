@@ -20,7 +20,9 @@
 - 주기: 입찰공고 `fixedDelay` 5분(`PT5M`), 사전규격 cron `0 0 8 * * *` (Asia/Seoul)
 - 재시도: API·메일 모두 1s, 2s, 4s 백오프(최대 3회 재시도). HTTP 200 + 비정상 결과코드는 재시도하지 않음
 - 에러 알림 임계치: 입찰공고 6회, 사전규격 1회 연속 실패. 장애 1건당 1회만 발송
-- 결과코드 `00` 정상, `03` 데이터 없음(정상 0건), 그 외 실패
+- 결과코드 `00` 정상, `03` 데이터 없음(정상 0건), 그 외 실패. 실측상 0건은 `00` + `items: []`로 온다
+- `nara.api.page-size`는 999 이하 (1000 이상은 오류 없이 10건으로 바뀌어 누락 발생 — 실측)
+- 필터: `keywords` OR `agencies`로 포함, `exclude-keywords`와 가격 범위는 AND (스펙 4절 필터 규칙)
 - 비밀값(`NARA_SERVICE_KEY`, `SMTP_*`, `DB_PASSWORD`)은 `.env`로 주입하고 커밋 금지
 - 커밋: Conventional Commits `<type>(<scope>): <제목>`, 한국어 본문, 마지막 줄 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - 테스트 실행: `./gradlew test` (Testcontainers 테스트는 Docker 데몬 필요)
@@ -71,6 +73,8 @@ src/test/resources/fixtures/*.json
 ---
 
 ### Task 1: 실제 API 응답 실측 (가정 확정)
+
+> **상태: 완료 (2026-10-24, 커밋 `ca968f9`).** 결과는 스펙 10절에 기록됨. 실행자는 이 Task를 건너뛴다.
 
 코드 없이 실제 서비스키로 API를 호출해 스펙 10절의 가정 5개를 확정한다. **서비스키가 없으면 이 Task에서 멈추고 사용자에게 발급(공공데이터포털에서 `입찰공고정보서비스`, `사전규격정보서비스` 두 건 활용신청)을 요청한다.** 응답에는 담당자 이름·전화번호가 들어 있으므로 원본 응답을 저장소에 커밋하지 않는다.
 
@@ -598,12 +602,26 @@ class NoticeFilterTest {
     }
 
     @Test
-    fun `수요기관은 부분일치로 매칭하고 기관명이 없으면 탈락한다`() {
-        val filter = Filter(agencies = listOf("서울"))
+    fun `수요기관만 설정하면 부분일치로 매칭하고 기관명이 없으면 탈락한다`() {
+        val filter = Filter(agencies = listOf("한국국제협력단"))
 
-        assertThat(filter.matches(aNotice(agency = "서울특별시 강남구"))).isTrue()
+        assertThat(filter.matches(aNotice(agency = "한국국제협력단 사업운영실"))).isTrue()
         assertThat(filter.matches(aNotice(agency = "부산광역시"))).isFalse()
         assertThat(filter.matches(aNotice(agency = null))).isFalse()
+    }
+
+    @Test
+    fun `키워드와 수요기관은 OR로 결합하고 제외 키워드는 양쪽에 적용한다`() {
+        val filter = Filter(
+            keywords = listOf("타당성"),
+            agencies = listOf("한국국제협력단"),
+            excludeKeywords = listOf("물품"),
+        )
+
+        assertThat(filter.matches(aNotice(title = "도로 타당성조사 용역", agency = "강원도"))).isTrue()
+        assertThat(filter.matches(aNotice(title = "사무실 이전 용역", agency = "한국국제협력단"))).isTrue()
+        assertThat(filter.matches(aNotice(title = "사무실 이전 용역", agency = "강원도"))).isFalse()
+        assertThat(filter.matches(aNotice(title = "사무용 물품 구매", agency = "한국국제협력단"))).isFalse()
     }
 }
 ```
@@ -621,33 +639,37 @@ package com.narareminder.notice
 
 import com.narareminder.config.NaraProperties
 
+// 키워드 OR 수요기관으로 포함 여부를 정하고, 제외 키워드와 가격 조건은 AND로 적용한다
 fun NaraProperties.Filter.matches(notice: Notice): Boolean =
-    matchesKeywords(notice.title) && matchesPrice(notice.price) && matchesAgency(notice.agency)
+    isIncluded(notice) &&
+        excludeKeywords.none { notice.title.contains(it, ignoreCase = true) } &&
+        matchesPrice(notice.price)
 
-private fun NaraProperties.Filter.matchesKeywords(title: String): Boolean =
-    (keywords.isEmpty() || keywords.any { title.contains(it, ignoreCase = true) }) &&
-        excludeKeywords.none { title.contains(it, ignoreCase = true) }
+private fun NaraProperties.Filter.isIncluded(notice: Notice): Boolean {
+    if (keywords.isEmpty() && agencies.isEmpty()) return true
+    val keywordHit = keywords.any { notice.title.contains(it, ignoreCase = true) }
+    val agencyHit = notice.agency?.let { agency -> agencies.any { agency.contains(it, ignoreCase = true) } } ?: false
+    return keywordHit || agencyHit
+}
 
 // 가격이 없는 공고는 누락 방지를 위해 통과시킨다
 private fun NaraProperties.Filter.matchesPrice(price: Long?): Boolean =
     price == null || ((priceMin == null || price >= priceMin) && (priceMax == null || price <= priceMax))
-
-private fun NaraProperties.Filter.matchesAgency(agency: String?): Boolean =
-    agencies.isEmpty() || (agency != null && agencies.any { agency.contains(it, ignoreCase = true) })
 ```
 
 - [ ] **Step 4: 테스트 통과 확인**
 
 Run: `./gradlew test --tests 'com.narareminder.notice.NoticeFilterTest'`
-Expected: PASS (6 tests)
+Expected: PASS (7 tests)
 
 - [ ] **Step 5: 커밋**
 
 ```bash
 git add src
-git commit -m "feat(filter): 키워드/가격/수요기관 공고 필터 추가
+git commit -m "feat(filter): 키워드/수요기관/가격 공고 필터 추가
 
-설정된 조건을 AND, 목록 값은 OR로 매칭하고 가격 정보가 없는 공고는 누락 방지를 위해 통과
+공고명 키워드 OR 수요기관으로 포함 여부를 정하고 제외 키워드와 가격 범위를 AND로 적용하며,
+가격 정보가 없는 공고는 누락 방지를 위해 통과
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -2307,7 +2329,7 @@ class NoticeJobs(private val pipeline: NoticePipeline) {
 - [ ] **Step 4: 전체 테스트 통과 확인**
 
 Run: `./gradlew test`
-Expected: PASS (전체 53 tests, 실패 0)
+Expected: PASS (전체 54 tests, 실패 0)
 
 - [ ] **Step 5: 커밋**
 
@@ -2420,11 +2442,84 @@ DB_PASSWORD=change-me
 ```yaml
 nara:
   filter:
-    keywords: [소프트웨어, 유지보수, AI]
+    # 공고명 부분일치. keywords 또는 agencies 중 하나만 맞아도 받는다
+    keywords:
+      - 타당성
+      - 타당성조사
+      - 사전타당성
+      - 예비타당성
+      - 타당성 검토
+      - 투자타당성
+      - 타당성평가 기준
+      - 기본계획
+      - 마스터플랜
+      - ODA
+      - EDCF
+      - 대외경제협력기금
+      - 개발협력
+      - 사후평가
+      - 추적조사
+      - PMC
+      - KSP
+      - 재무
+      - 재무분석
+      - 재무모델
+      - 재무성 분석
+      - 회계
+      - 원가
+      - 경제성분석
+      - 가치평가
+      - 투자검토
+      - 투자사업 평가
+      - 사업비 검증
+      - 펀드
+      - 기업지원펀드
+      - 사업추진전략
+      - 재원조달
+      - PPP
+      - 해외진출
+      - 사업화 전략
+      - 컨설팅
+      - 고속철도
+      - 철도신설
+      - 철도개발전략
+      - 철도시설물
+      - 관제
+      - 재해
+      - 교량
+      - LNG
+      - 천연가스
+      - 가스
+      - 발전소
+      - 신재생
+      - 기후변화
+      - 탄소중립
+      - 그린
+      - 국립병원
+      - 암센터
+      - 보건의료
+      - 의료
+      - 수자원
+      - 수자원관리
+      - 정수장
+      - 하수처리
+      - 상하수도
+      - 국제업무지구
+      - 지역개발
+    # 수요기관(사전규격은 실수요기관) 부분일치
+    agencies:
+      - 한국국제협력단
+      - 한국수출입은행
+      - 해외건설협회
+      - 한국교통연구원
+      - 한국가스공사
+      - 한국서부발전
+      - 한국자산관리공사
+      - 한국해외인프라도시개발지원공사
+      - 한국개발연구원
+      - 한국환경산업기술원
     exclude-keywords: []
-    categories: [SERVICE, GOODS]
-    price-min: 50000000
-    agencies: []
+    categories: [GOODS, SERVICE, CONSTRUCTION, FOREIGN]
 ```
 
 - [ ] **Step 2: 이미지 빌드 확인**
@@ -2461,11 +2556,12 @@ docker compose logs -f app
 
 ## 필터 규칙
 
-- 조건끼리는 AND, 목록 안의 값끼리는 OR. 비어 있는 조건은 검사하지 않는다.
-- `keywords` / `exclude-keywords`: 공고명 부분일치(대소문자 무시)
+- `keywords`(공고명) **또는** `agencies`(수요기관) 중 하나만 맞아도 받는다. 둘 다 비어 있으면 전부 받는다.
+- 위를 통과한 공고 중 `exclude-keywords`가 공고명에 있으면 제외하고, 가격 범위를 벗어나면 제외한다.
+- 문자열은 모두 부분일치(대소문자 무시). 띄어쓰기가 다르면 다른 단어로 본다(`유지관리` ≠ `유지 관리`).
 - `categories`: `GOODS`(물품) `SERVICE`(용역) `CONSTRUCTION`(공사) `FOREIGN`(외자)
 - `price-min` / `price-max`: 입찰공고는 추정가격, 사전규격은 배정예산 기준(이상/이하). 가격이 없는 공고는 통과
-- `agencies`: 입찰공고는 수요기관, 사전규격은 실수요기관 부분일치
+- `agencies`: 입찰공고는 수요기관, 사전규격은 실수요기관 기준
 
 ## 운영 참고
 

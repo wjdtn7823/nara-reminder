@@ -25,6 +25,7 @@
 - 외부 접속 (Tailscale Funnel 또는 Cloudflare Tunnel)
 - 다중 사용자 / 사용자별 구독
 - 이메일 외 알림 채널 (Discord, Slack, 텔레그램)
+- 참가가능지역 필터 (입찰공고 목록 응답에 지역 필드가 없어 별도 오퍼레이션 조회 필요)
 - 발주계획 API
 
 ## 2. 기술 스택
@@ -78,9 +79,8 @@ data class Notice(
     val noticeOrd: String,         // 공고차수 (사전규격은 "0")
     val title: String,
     val category: NoticeCategory,  // GOODS | SERVICE | CONSTRUCTION | FOREIGN
-    val estimatedPrice: Long?,
-    val region: String?,
-    val agency: String?,           // 수요기관명
+    val price: Long?,              // BID: 추정가격(presmptPrce) / PRE_SPEC: 배정예산(asignBdgtAmt)
+    val agency: String?,           // BID: 수요기관명(dminsttNm) / PRE_SPEC: 실수요기관명(rlDminsttNm)
     val postedAt: LocalDateTime,
     val deadlineAt: LocalDateTime?,// 입찰마감 / 의견등록마감
     val detailUrl: String,
@@ -114,7 +114,6 @@ nara:
     categories: [SERVICE, GOODS]   # GOODS | SERVICE | CONSTRUCTION | FOREIGN
     price-min: 50000000
     price-max: null
-    regions: []
     agencies: []
 
 spring:
@@ -130,12 +129,11 @@ spring:
 ### 필터 규칙
 
 - 조건 간에는 **AND**로 결합한다.
-- 목록 조건(`keywords`, `categories`, `regions`, `agencies`)은 목록 안의 값끼리 **OR**로 매칭하고, 목록이 비어 있으면 그 조건은 검사하지 않는다.
+- 목록 조건(`keywords`, `categories`, `agencies`)은 목록 안의 값끼리 **OR**로 매칭하고, 목록이 비어 있으면 그 조건은 검사하지 않는다.
 - `keywords`, `exclude-keywords`: 공고명 부분일치, 대소문자 무시. 제외 키워드가 하나라도 포함되면 탈락한다.
-- `price-min` / `price-max`: 양 끝 값을 포함한다(이상/이하). 가격 조건이 설정돼 있는데 추정가격이 없는 공고는 통과시킨다(누락 방지).
-- `regions`: 응답의 지역 필드 부분일치.
+- `price-min` / `price-max`: `Notice.price` 기준, 양 끝 값을 포함한다(이상/이하). 가격 조건이 설정돼 있는데 가격이 없는 공고는 통과시킨다(누락 방지).
 - `agencies`: 수요기관명 부분일치.
-- `categories`: 입찰공고는 업무구분별 엔드포인트를 따로 호출하므로, 설정된 업무구분만 호출한다.
+- `categories`: 입찰공고·사전규격 모두 업무구분별 오퍼레이션을 따로 호출하므로, 설정된 업무구분만 호출한다.
 
 ## 5. 데이터 모델 (Flyway)
 
@@ -144,7 +142,7 @@ CREATE TABLE notified_notice (
     source       VARCHAR(16)  NOT NULL,   -- BID | PRE_SPEC
     notice_no    VARCHAR(64)  NOT NULL,
     notice_ord   VARCHAR(16)  NOT NULL,
-    title        VARCHAR(1000) NOT NULL,
+    title        TEXT         NOT NULL,   -- 길이 초과로 기록이 실패하면 매 배치 중복 발송되므로 TEXT
     notified_at  TIMESTAMPTZ  NOT NULL,
     PRIMARY KEY (source, notice_no, notice_ord)
 );
@@ -216,7 +214,7 @@ CREATE TABLE job_state (
 
 | 대상 | 방식 | 케이스 |
 |---|---|---|
-| `NoticeFilter` | 단위 테스트 | 키워드 OR, 제외 키워드, 가격 경계값, 가격 없음 통과, 빈 조건 통과, 지역/기관 부분일치 |
+| `NoticeFilter` | 단위 테스트 | 키워드 OR, 제외 키워드, 가격 경계값, 가격 없음 통과, 빈 조건 통과, 기관 부분일치 |
 | `NaraApiClient` | MockWebServer + 응답 샘플 JSON | 정상 파싱, 페이지 순회, 200 + 에러 결과코드, 5xx 재시도 후 성공/실패, 정정 여부 판정 |
 | `BidPollingJob` / `PreSpecDailyJob` | MockK | 0건이면 메일 없음, 중복 제외, 메일 실패 시 미기록·`lastSuccessAt` 유지, 일부 업무구분 실패, 조회 구간 계산(최초/정상/장기 중단), 연속 실패 알림 1회만 발송, 성공 시 초기화 |
 | Repository | Testcontainers PostgreSQL | 발송 이력 저장/조회, PK 중복, `job_state` 갱신 |
@@ -228,11 +226,26 @@ CREATE TABLE job_state (
 - 타임존: 컨테이너와 JVM 모두 `Asia/Seoul`.
 - `.env.example`로 필요한 환경변수 목록을 제공한다.
 
-## 10. 구현 계획 단계에서 확인할 항목
+## 10. API 명세 (공공데이터포털 확인, 2026-10-24)
 
-API 명세는 공공데이터포털 문서로 확인한 뒤 확정한다.
+| 구분 | Base URL | 목록 오퍼레이션 (물품/용역/공사/외자) |
+|---|---|---|
+| 입찰공고 | `https://apis.data.go.kr/1230000/ad/BidPublicInfoService` | `getBidPblancListInfoThng` / `Servc` / `Cnstwk` / `Frgcpt` |
+| 사전규격 | `https://apis.data.go.kr/1230000/ao/HrcspSsstndrdInfoService` | `getPublicPrcureThngInfoThng` / `Servc` / `Cnstwk` / `Frgcpt` |
 
-- 입찰공고정보서비스: 업무구분별 오퍼레이션명, 등록일시 조회 파라미터(`inqryDiv`, `inqryBgnDt`, `inqryEndDt`) 형식, 페이지 최대 건수, 지역/수요기관/추정가격/차수 필드명, 상세 URL 필드
-- 사전규격정보서비스: 업무구분별 오퍼레이션명과 필드명, 의견등록마감 필드
-- 계정 유형별 일일 트래픽 한도. 5분 주기 × 업무구분 수 × 페이지 수가 한도를 넘으면 운영계정 전환이 필요한지 판단하고 README에 안내한다.
-- 정정공고 판정 기준(차수 값의 시작값과 형식)
+- 공통 요청 파라미터: `serviceKey`, `pageNo`, `numOfRows`, `type=json`, `inqryDiv`, `inqryBgnDt`, `inqryEndDt`
+- 응답 구조: `response.header.{resultCode, resultMsg}`, `response.body.{items, totalCount, numOfRows, pageNo}`
+- 결과코드: `00` 정상, `03` 데이터 없음(정상 0건으로 처리), 그 외 실패
+- 일일 트래픽: 개발계정 1,000회(오퍼레이션별), 운영계정은 활용사례 등록 후 증설 신청
+- 입찰공고 사용 필드: `bidNtceNo`, `bidNtceOrd`, `bidNtceNm`, `dminsttNm`, `presmptPrce`, `bidClseDt`, `bidNtceDt`, `rgstDt`, `bidNtceDtlUrl`
+- 사전규격 사용 필드: `bfSpecRgstNo`, `prdctClsfcNoNm`, `rlDminsttNm`, `asignBdgtAmt`, `opninRgstClseDt`, `rgstDt`. 사전규격 상세 URL 필드는 없으므로 나라장터 메인 링크와 등록번호를 함께 표시한다.
+
+### 구현 첫 작업에서 실측으로 확정할 항목
+
+공식 명세에 예시값이 없어 실제 서비스키로 호출해 확정하고, 응답을 테스트 fixture로 저장한다.
+
+- `inqryDiv` 값 (등록일시 기준 조회 코드, `1`로 가정)
+- 날짜 파라미터·응답 형식 (`yyyyMMddHHmm` / `yyyy-MM-dd HH:mm:ss`로 가정)
+- 최초 공고의 `bidNtceOrd` 표기 (`"000"`으로 가정 → 정수값 > 0이면 정정)
+- `numOfRows` 최대값 (100으로 사용)
+- 데이터가 없을 때 `items`의 형태 (빈 문자열 / 빈 배열 / 결과코드 `03`)

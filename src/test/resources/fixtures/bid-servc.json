@@ -1,0 +1,4 @@
+{"response":{"header":{"resultCode":"00","resultMsg":"정상"},"body":{"items":[
+  {"bidNtceNo":"R26BK00000001","bidNtceOrd":"000","bidNtceNm":"차세대 AI 플랫폼 구축 용역","dminsttNm":"조달청","presmptPrce":"150000000","bidClseDt":"2026-11-03 10:00:00","bidNtceDt":"2026-10-24 13:10:00","rgstDt":"2026-10-24 13:10:12","bidNtceDtlUrl":"https://www.g2b.go.kr/notice/R26BK00000001"},
+  {"bidNtceNo":"R26BK00000002","bidNtceOrd":"001","bidNtceNm":"홈페이지 유지보수 & 운영","dminsttNm":"서울특별시","presmptPrce":"","bidClseDt":"","bidNtceDt":"2026-10-24 13:20:00","rgstDt":"2026/10/24","bidNtceDtlUrl":""}
+],"numOfRows":100,"pageNo":1,"totalCount":2}}}

@@ -52,7 +52,14 @@ class NoticePipeline(
                 }
             }
 
-            val newNotices = excludeNotified(fetched.filter { props.filter.matches(it) })
+            val newNotices = try {
+                excludeNotified(fetched.filter { props.filter.matches(it) })
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errors += "발송 이력 조회 실패: ${e.message}"
+                emptyList()
+            }
             if (newNotices.isNotEmpty()) {
                 try {
                     retrying(props.retryDelays) { mailNotifier.sendNotices(job.source, newNotices, now) }
@@ -71,7 +78,14 @@ class NoticePipeline(
                 log.error("[{}] 수집 실패 ({}회 연속): {}", job, state.consecutiveFailures, errors)
                 alertIfNeeded(job, state, settings, errors)
             }
-            jobStateRepository.save(state)
+            try {
+                jobStateRepository.save(state)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error("[{}] 작업 상태 저장 실패", job, e)
+                throw e
+            }
         }
     }
 

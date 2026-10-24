@@ -193,4 +193,17 @@ class NoticePipelineTest {
         assertThat(state.alertSent).isFalse()
         verify { jobStateRepository.save(state) }
     }
+
+    @Test
+    fun `발송 이력 조회가 실패하면 메일 없이 실패로 처리한다`() {
+        coEvery { client.fetch(any(), any(), any(), any()) } returns listOf(aNotice(title = "AI 플랫폼"))
+        every { notifiedNoticeRepository.findAllById(any()) } throws RuntimeException("DB 오류")
+
+        runBid()
+
+        verify(exactly = 0) { mailNotifier.sendNotices(any(), any(), any()) }
+        assertThat(state.consecutiveFailures).isEqualTo(1)
+        assertThat(state.lastSuccessAt).isNull()
+        verify { jobStateRepository.save(state) }
+    }
 }

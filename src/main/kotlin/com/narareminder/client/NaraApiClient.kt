@@ -71,7 +71,7 @@ class NaraApiClient(
                 .retrieve()
                 .awaitBody<String>()
         } catch (e: WebClientResponseException) {
-            throw NaraApiException("HTTP ${e.statusCode.value()}", retryable = e.statusCode.is5xxServerError, cause = e)
+            throw NaraApiException("HTTP ${e.statusCode.value()}", retryable = !e.statusCode.is4xxClientError, cause = e)
         } catch (e: WebClientRequestException) {
             throw NaraApiException("요청 실패: ${e.message}", retryable = true, cause = e)
         }

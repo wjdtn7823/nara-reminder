@@ -7,6 +7,7 @@ import com.narareminder.notice.NoticeSource
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -180,5 +181,26 @@ class NaraApiClientTest {
             .isInstanceOf(NaraApiException::class.java)
             .hasMessageContaining("500")
         assertThat(server.requestCount).isEqualTo(4)
+    }
+
+    @Test
+    fun `응답 본문 수신 중 연결이 끊기면 재시도 후 성공한다`() = runBlocking<Unit> {
+        server.enqueue(json(page(1, "N1")).setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY))
+        server.enqueue(json(page(1, "N1")))
+
+        val notices = client().fetch(NoticeSource.BID, NoticeCategory.SERVICE, from, to)
+
+        assertThat(notices).hasSize(1)
+        assertThat(server.requestCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `4xx는 재시도 없이 실패한다`() {
+        server.enqueue(MockResponse().setResponseCode(400))
+
+        assertThatThrownBy { runBlocking { client().fetch(NoticeSource.BID, NoticeCategory.SERVICE, from, to) } }
+            .isInstanceOf(NaraApiException::class.java)
+            .hasMessageContaining("400")
+        assertThat(server.requestCount).isEqualTo(1)
     }
 }

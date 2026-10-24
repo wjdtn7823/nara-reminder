@@ -66,6 +66,16 @@ class MailNotifierTest {
             .contains("2026-11-03 10:00")
             .contains("https://www.g2b.go.kr/notice/N1")
             .contains("<td>-</td>")
+            .contains("<th>추정가격</th>")
+    }
+
+    @Test
+    fun `사전규격 메일의 가격 열은 배정예산으로 표시한다`() {
+        notifier.sendNotices(NoticeSource.PRE_SPEC, listOf(aNotice(source = NoticeSource.PRE_SPEC, noticeOrd = "0")), now)
+
+        assertThat(html())
+            .contains("<th>배정예산</th>")
+            .doesNotContain("추정가격")
     }
 
     @Test

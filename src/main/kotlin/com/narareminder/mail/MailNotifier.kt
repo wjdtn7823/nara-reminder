@@ -23,7 +23,7 @@ class MailNotifier(
             NoticeSource.BID -> "[나라장터] 새 입찰공고 ${notices.size}건 (${now.atZone(KST).format(SUBJECT_DATE_TIME)})"
             NoticeSource.PRE_SPEC -> "[나라장터] 사전규격 ${notices.size}건 (${now.atZone(KST).format(SUBJECT_DATE)})"
         }
-        send(subject, noticeTable(notices))
+        send(subject, noticeTable(source, notices))
     }
 
     fun sendAlert(job: JobName, consecutiveFailures: Int, lastSuccessAt: Instant?, error: String) {
@@ -37,7 +37,11 @@ class MailNotifier(
         send(subject, html)
     }
 
-    private fun noticeTable(notices: List<Notice>): String {
+    private fun noticeTable(source: NoticeSource, notices: List<Notice>): String {
+        val priceLabel = when (source) {
+            NoticeSource.BID -> "추정가격"
+            NoticeSource.PRE_SPEC -> "배정예산"
+        }
         val rows = notices.sortedBy { it.postedAt }.joinToString("\n") { notice ->
             val title = (if (notice.isRevision) "[정정] " else "") + notice.title
             """
@@ -52,7 +56,7 @@ class MailNotifier(
         }
         return """
             <table border="1" cellpadding="6" cellspacing="0">
-            <tr><th>공고명</th><th>업무구분</th><th>수요기관</th><th>가격</th><th>마감일시</th></tr>
+            <tr><th>공고명</th><th>업무구분</th><th>수요기관</th><th>$priceLabel</th><th>마감일시</th></tr>
             $rows
             </table>
         """.trimIndent()

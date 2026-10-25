@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { FiltersPage } from './pages/FiltersPage'
+import { RunsPage } from './pages/RunsPage'
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/filters" replace />} />
           <Route path="/filters" element={<FiltersPage />} />
+          <Route path="/runs" element={<RunsPage />} />
           <Route path="*" element={<Navigate to="/filters" replace />} />
         </Routes>
       </main>

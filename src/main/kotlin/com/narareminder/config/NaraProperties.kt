@@ -23,6 +23,7 @@ data class NaraProperties(
     data class Mail(
         val from: String,
         val to: List<String>,
+        val fromName: String = "나라장터 알림",
     )
 
     data class Job(

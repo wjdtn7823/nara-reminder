@@ -11,6 +11,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import jakarta.mail.Session
+import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -38,7 +39,9 @@ class MailNotifierTest {
         notifier.sendNotices(NoticeSource.BID, listOf(aNotice(noticeNo = "N1"), aNotice(noticeNo = "N2")), now)
 
         assertThat(sent.captured.subject).isEqualTo("[나라장터] 새 입찰공고 2건 (10/24 14:05)")
-        assertThat(sent.captured.from.single().toString()).isEqualTo("bot@example.com")
+        val from = sent.captured.from.single() as InternetAddress
+        assertThat(from.address).isEqualTo("bot@example.com")
+        assertThat(from.personal).isEqualTo("나라장터 알림")
         assertThat(sent.captured.allRecipients.map { it.toString() }).containsExactly("me@example.com")
     }
 

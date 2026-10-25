@@ -65,7 +65,7 @@ class MailNotifier(
     private fun send(subject: String, html: String) {
         val message = mailSender.createMimeMessage()
         MimeMessageHelper(message, false, "UTF-8").apply {
-            setFrom(props.mail.from)
+            setFrom(props.mail.from, props.mail.fromName)
             setTo(props.mail.to.toTypedArray())
             setSubject(subject)
             setText(html, true)

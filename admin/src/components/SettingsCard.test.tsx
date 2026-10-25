@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { updateSettings } from '../api/filters'
+import type { Filters } from '../types'
 import { SettingsCard } from './SettingsCard'
 
 vi.mock('../api/filters')
@@ -32,15 +33,16 @@ describe('SettingsCard', () => {
   })
 
   it('저장하면 숫자로 변환해 보내고 적용 안내를 보여 준다', async () => {
-    vi.mocked(updateSettings).mockResolvedValue({
+    const response: Filters = {
       keywords: [], excludeKeywords: [], agencies: [], categories: ['GOODS', 'SERVICE', 'FOREIGN'], priceMin: 1000, priceMax: null,
-    })
+    }
+    vi.mocked(updateSettings).mockResolvedValue(response)
     renderCard()
     await userEvent.click(screen.getByLabelText('외자'))
     await userEvent.type(screen.getByLabelText('최소 가격'), '1000')
     await userEvent.click(screen.getByRole('button', { name: '저장' }))
     expect(updateSettings).toHaveBeenCalledWith({ categories: ['GOODS', 'SERVICE', 'FOREIGN'], priceMin: 1000, priceMax: null })
     expect(await screen.findByRole('status')).toHaveTextContent('다음 수집(최대 5분)부터 적용됩니다')
-    expect(onSaved).toHaveBeenCalled()
+    expect(onSaved).toHaveBeenCalledWith(response)
   })
 })

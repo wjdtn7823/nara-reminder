@@ -33,11 +33,10 @@ export function FiltersPage() {
       <TermListCard title="수요기관" type="AGENCY" terms={filters.agencies} onChanged={load} />
       <TermListCard title="제외 키워드" type="EXCLUDE_KEYWORD" terms={filters.excludeKeywords} onChanged={load} />
       <SettingsCard
-        key={`${filters.categories.join()}-${filters.priceMin}-${filters.priceMax}`}
         categories={filters.categories}
         priceMin={filters.priceMin}
         priceMax={filters.priceMax}
-        onSaved={load}
+        onSaved={setFilters}
       />
     </div>
   )

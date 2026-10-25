@@ -1,13 +1,13 @@
 import { type FormEvent, useState } from 'react'
 import { ApiError } from '../api/client'
 import { updateSettings } from '../api/filters'
-import { CATEGORIES, CATEGORY_LABELS, type Category } from '../types'
+import { CATEGORIES, CATEGORY_LABELS, type Category, type Filters } from '../types'
 
 interface SettingsCardProps {
   categories: Category[]
   priceMin: number | null
   priceMax: number | null
-  onSaved: () => void
+  onSaved: (filters: Filters) => void
 }
 
 const toNumber = (text: string): number | null => (text.trim() === '' ? null : Number(text))
@@ -33,13 +33,13 @@ export function SettingsCard({ categories, priceMin, priceMax, onSaved }: Settin
     }
     setError(null)
     try {
-      await updateSettings({
+      const updated = await updateSettings({
         categories: CATEGORIES.filter((c) => selected.includes(c)),
         priceMin: priceMinValue,
         priceMax: priceMaxValue,
       })
       setSaved(true)
-      onSaved()
+      onSaved(updated)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : '저장에 실패했습니다')
     }

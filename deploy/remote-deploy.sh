@@ -7,15 +7,25 @@ git fetch -q origin master
 git checkout -q master
 git reset -q --hard origin/master
 
-docker compose pull app
+docker compose pull app web
+
+# 호스트에 직접 설치했던 Caddy 는 web 컨테이너로 대체한다 (80/443 충돌 방지, 1회성)
+# 이미지를 받은 뒤에 전환해야 pull 실패 시 서비스 공백이 생기지 않는다
+if systemctl is-active --quiet caddy 2>/dev/null || systemctl is-enabled --quiet caddy 2>/dev/null; then
+  systemctl disable --now caddy
+  DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 remove -y -qq caddy > /dev/null
+fi
+
 docker compose up -d --no-build
 docker image prune -f > /dev/null
 
 # 기동 직후 설정 오류로 재시작 루프에 빠지지 않았는지 확인한다
 sleep 30
-if [ "$(docker compose ps app --format '{{.State}}')" != "running" ]; then
-  docker compose logs --tail 50 app
-  exit 1
-fi
+for service in app web; do
+  if [ "$(docker compose ps "$service" --format '{{.State}}')" != "running" ]; then
+    docker compose logs --tail 50 "$service"
+    exit 1
+  fi
+done
 git log --oneline -1
 echo "DEPLOY_OK"

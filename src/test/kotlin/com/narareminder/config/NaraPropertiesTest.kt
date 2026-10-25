@@ -1,6 +1,5 @@
 package com.narareminder.config
 
-import com.narareminder.notice.NoticeCategory
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.context.properties.bind.Binder
@@ -38,27 +37,5 @@ class NaraPropertiesTest {
         assertThat(props.preSpec.alertAfterFailures).isEqualTo(1)
         assertThat(props.api.pageSize).isEqualTo(100)
         assertThat(props.retryDelays).containsExactly(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(4))
-    }
-
-    @Test
-    fun `필터 기본값은 전체 업무구분과 빈 조건이다`() {
-        val filter = bind().filter
-
-        assertThat(filter.categories).containsExactlyElementsOf(NoticeCategory.entries)
-        assertThat(filter.keywords).isEmpty()
-        assertThat(filter.priceMin).isNull()
-    }
-
-    @Test
-    fun `필터 조건을 바인딩한다`() {
-        val filter = bind(
-            "nara.filter.keywords" to "AI,유지보수",
-            "nara.filter.categories" to "SERVICE,GOODS",
-            "nara.filter.price-min" to "50000000",
-        ).filter
-
-        assertThat(filter.keywords).containsExactly("AI", "유지보수")
-        assertThat(filter.categories).containsExactly(NoticeCategory.SERVICE, NoticeCategory.GOODS)
-        assertThat(filter.priceMin).isEqualTo(50_000_000L)
     }
 }

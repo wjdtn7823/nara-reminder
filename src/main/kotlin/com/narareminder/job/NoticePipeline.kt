@@ -2,6 +2,7 @@ package com.narareminder.job
 
 import com.narareminder.client.NaraApiClient
 import com.narareminder.config.NaraProperties
+import com.narareminder.filter.FilterService
 import com.narareminder.mail.MailNotifier
 import com.narareminder.notice.Notice
 import com.narareminder.notice.matches
@@ -26,6 +27,8 @@ class NoticePipeline(
     private val notifiedNoticeRepository: NotifiedNoticeRepository,
     private val jobStateRepository: JobStateRepository,
     private val mailNotifier: MailNotifier,
+    private val filterService: FilterService,
+    private val jobRunRepository: JobRunRepository,
     private val props: NaraProperties,
     private val clock: Clock,
 ) {
@@ -35,13 +38,14 @@ class NoticePipeline(
     suspend fun run(job: JobName) {
         // JPA·SMTP 블로킹 호출이 WebClient 이벤트 루프 스레드에서 실행되지 않도록 IO 디스패처로 옮긴다
         withContext(Dispatchers.IO) {
+            val filter = filterService.current()
             val settings = props.settingsOf(job)
             val now = clock.instant()
             val state = jobStateRepository.findByIdOrNull(job) ?: JobState(job)
             val window = QueryWindow.of(state.lastSuccessAt, now, settings)
             val errors = mutableListOf<String>()
 
-            val fetched = props.filter.categories.flatMap { category ->
+            val fetched = filter.categories.flatMap { category ->
                 try {
                     client.fetch(job.source, category, window.from.toKst(), window.to.toKst())
                 } catch (e: CancellationException) {
@@ -53,17 +57,19 @@ class NoticePipeline(
             }
 
             val newNotices = try {
-                excludeNotified(fetched.filter { props.filter.matches(it) })
+                excludeNotified(fetched.filter { filter.matches(it) })
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 errors += "발송 이력 조회 실패: ${e.message ?: e.javaClass.simpleName}"
                 emptyList()
             }
+            var sentCount = 0
             if (newNotices.isNotEmpty()) {
                 try {
                     retrying(props.retryDelays) { mailNotifier.sendNotices(job.source, newNotices, now) }
                     notifiedNoticeRepository.saveAll(newNotices.map { NotifiedNotice(it.notifiedId(), it.title, now) })
+                    sentCount = newNotices.size
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -78,6 +84,7 @@ class NoticePipeline(
                 log.error("[{}] 수집 실패 ({}회 연속): {}", job, state.consecutiveFailures, errors)
                 alertIfNeeded(job, state, settings, errors)
             }
+            recordRun(job, now, window, fetched.size, newNotices.size, sentCount, errors)
             try {
                 jobStateRepository.save(state)
             } catch (e: CancellationException) {
@@ -86,6 +93,26 @@ class NoticePipeline(
                 log.error("[{}] 작업 상태 저장 실패", job, e)
                 throw e
             }
+        }
+    }
+
+    // 실행 이력은 조회용 부가 정보라 저장에 실패해도 수집 결과에는 영향을 주지 않는다
+    private fun recordRun(
+        job: JobName, startedAt: Instant, window: QueryWindow,
+        fetchedCount: Int, matchedCount: Int, sentCount: Int, errors: List<String>,
+    ) {
+        try {
+            jobRunRepository.save(
+                JobRun(
+                    jobName = job, startedAt = startedAt, finishedAt = clock.instant(),
+                    windowFrom = window.from, windowTo = window.to,
+                    fetchedCount = fetchedCount, matchedCount = matchedCount, sentCount = sentCount,
+                    status = if (errors.isEmpty()) JobRunStatus.SUCCESS else JobRunStatus.FAILURE,
+                    error = errors.takeIf { it.isNotEmpty() }?.joinToString("\n"),
+                ),
+            )
+        } catch (e: Exception) {
+            log.error("[{}] 실행 이력 저장 실패", job, e)
         }
     }
 

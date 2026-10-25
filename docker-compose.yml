@@ -23,13 +23,30 @@ services:
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/nara
       TZ: Asia/Seoul
-    volumes:
-      # 필터 설정은 재빌드 없이 수정 후 `docker compose restart app` 으로 반영한다
-      - ./config/application.yml:/app/config/application.yml:ro
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
 
+  web:
+    image: ghcr.io/wjdtn7823/nara-reminder-web:latest
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    environment:
+      # 운영 .env 에 도메인을 넣으면 Caddy 가 HTTPS 인증서를 자동 발급한다. 로컬은 :80
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

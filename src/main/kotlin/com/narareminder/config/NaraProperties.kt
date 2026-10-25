@@ -1,6 +1,5 @@
 package com.narareminder.config
 
-import com.narareminder.notice.NoticeCategory
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
 
@@ -11,7 +10,6 @@ data class NaraProperties(
     val bid: Job,
     val preSpec: Job,
     val api: Api = Api(),
-    val filter: Filter = Filter(),
     val retryDelays: List<Duration> = listOf(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(4)),
 ) {
     data class Api(
@@ -31,14 +29,5 @@ data class NaraProperties(
         val initialLookback: Duration,
         val maxLookback: Duration,
         val alertAfterFailures: Int,
-    )
-
-    data class Filter(
-        val keywords: List<String> = emptyList(),
-        val excludeKeywords: List<String> = emptyList(),
-        val categories: List<NoticeCategory> = NoticeCategory.entries,
-        val priceMin: Long? = null,
-        val priceMax: Long? = null,
-        val agencies: List<String> = emptyList(),
     )
 }

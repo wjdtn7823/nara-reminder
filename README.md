@@ -22,12 +22,12 @@ docker compose logs -f app
 
 필터는 어드민 화면(`https://<도메인>/filters`)에서 관리하며 저장 즉시 다음 수집부터 적용된다. DB(`filter_term`, `filter_setting`)에 저장된다.
 
-- `keywords`(공고명) **또는** `agencies`(수요기관) 중 하나만 맞아도 받는다. 둘 다 비어 있으면 전부 받는다.
-- 위를 통과한 공고 중 `exclude-keywords`가 공고명에 있으면 제외하고, 가격 범위를 벗어나면 제외한다.
+- 키워드(공고명) **또는** 수요기관 중 하나만 맞아도 받는다. 둘 다 비어 있으면 전부 받는다.
+- 위를 통과한 공고 중 제외 키워드가 공고명에 있으면 제외하고, 가격 범위를 벗어나면 제외한다.
 - 문자열은 모두 부분일치(대소문자 무시). 띄어쓰기가 다르면 다른 단어로 본다(`유지관리` ≠ `유지 관리`).
-- `categories`: `GOODS`(물품) `SERVICE`(용역) `CONSTRUCTION`(공사) `FOREIGN`(외자)
-- `price-min` / `price-max`: 입찰공고는 추정가격, 사전규격은 배정예산 기준(이상/이하). 가격이 없는 공고는 통과
-- `agencies`: 입찰공고는 수요기관, 사전규격은 실수요기관 기준
+- 업무구분: 물품(GOODS) 용역(SERVICE) 공사(CONSTRUCTION) 외자(FOREIGN)
+- 최소/최대 가격: 입찰공고는 추정가격, 사전규격은 배정예산 기준(이상/이하). 가격이 없는 공고는 통과
+- 수요기관: 입찰공고는 수요기관, 사전규격은 실수요기관 기준
 
 ## 어드민 화면
 
@@ -56,6 +56,7 @@ docker compose logs -f app
 - 필터 변경: 어드민 화면에서 한다.
 - 수동 재배포: Actions 탭에서 `Deploy` → "Run workflow" (`master`만 가능).
 - 롤백: VM에서 `docker compose` 이미지 태그를 이전 커밋 SHA(`ghcr.io/wjdtn7823/nara-reminder:<sha>`, `ghcr.io/wjdtn7823/nara-reminder-web:<sha>`)로 지정해 실행한다.
+- 어드민 도입(필터 DB 이관) 이전 버전으로 되돌릴 때는 이미지 태그만 바꾸면 안 된다. 구버전은 `config/application.yml` 필터 파일이 없으면 필터가 비어 **모든 공고를 메일로 보낸다**. VM 에서 `git -C /opt/nara-reminder checkout d06d7df` 로 필터 파일·compose 마운트를 복원한 뒤 `docker compose up -d app` 을 실행한다.
 
 ## 개발
 

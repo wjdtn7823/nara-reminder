@@ -28,6 +28,8 @@ server:
 
 nara:
   service-key: ${NARA_SERVICE_KEY}
+  discord:
+    webhook-url: ${DISCORD_WEBHOOK_URL:}
   mail:
     from: ${MAIL_FROM}
     to: ${MAIL_TO}

@@ -10,6 +10,7 @@ data class NaraProperties(
     val bid: Job,
     val preSpec: Job,
     val api: Api = Api(),
+    val discord: Discord = Discord(),
     val retryDelays: List<Duration> = listOf(Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(4)),
 ) {
     data class Api(
@@ -22,6 +23,10 @@ data class NaraProperties(
         val from: String,
         val to: List<String>,
         val fromName: String = "나라장터 알림",
+    )
+
+    data class Discord(
+        val webhookUrl: String = "",
     )
 
     data class Job(

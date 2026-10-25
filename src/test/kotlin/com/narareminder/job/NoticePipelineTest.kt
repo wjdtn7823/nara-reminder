@@ -1,5 +1,6 @@
 package com.narareminder.job
 
+import com.narareminder.alert.DiscordNotifier
 import com.narareminder.client.NaraApiClient
 import com.narareminder.client.NaraApiException
 import com.narareminder.config.NaraProperties
@@ -37,6 +38,7 @@ class NoticePipelineTest {
     private val notifiedNoticeRepository = mockk<NotifiedNoticeRepository>()
     private val jobStateRepository = mockk<JobStateRepository>()
     private val mailNotifier = mockk<MailNotifier>(relaxed = true)
+    private val discordNotifier = mockk<DiscordNotifier>(relaxed = true)
     private val state = JobState(JobName.BID_POLLING)
 
     private val filterService = mockk<FilterService>()
@@ -47,7 +49,7 @@ class NoticePipelineTest {
     private fun pipeline(filter: FilterCriteria = aiFilter, props: NaraProperties = testProperties()): NoticePipeline {
         every { filterService.current() } returns filter
         return NoticePipeline(
-            client, notifiedNoticeRepository, jobStateRepository, mailNotifier, filterService, jobRunRepository, props, Clock.fixed(now, KST),
+            client, notifiedNoticeRepository, jobStateRepository, mailNotifier, discordNotifier, filterService, jobRunRepository, props, Clock.fixed(now, KST),
         )
     }
 
@@ -221,8 +223,32 @@ class NoticePipelineTest {
         verify(exactly = 1) {
             mailNotifier.sendAlert(JobName.BID_POLLING, 2, null, match { it.contains("결과코드 30") })
         }
+        verify(exactly = 1) {
+            discordNotifier.sendAlert(JobName.BID_POLLING, 2, null, match { it.contains("결과코드 30") })
+        }
         assertThat(state.alertSent).isTrue()
         assertThat(state.consecutiveFailures).isEqualTo(3)
+    }
+
+    @Test
+    fun `메일 알림이 실패해도 디스코드로 보냈으면 알림 완료로 본다`() {
+        coEvery { client.fetch(any(), any(), any(), any()) } throws NaraApiException("HTTP 500", retryable = true)
+        every { mailNotifier.sendAlert(any(), any(), any(), any()) } throws RuntimeException("SMTP 오류")
+        every { discordNotifier.sendAlert(any(), any(), any(), any()) } returns true
+
+        runBid(props = testProperties(bidAlertAfterFailures = 1))
+
+        assertThat(state.alertSent).isTrue()
+    }
+
+    @Test
+    fun `디스코드 알림이 실패해도 메일로 보냈으면 알림 완료로 본다`() {
+        coEvery { client.fetch(any(), any(), any(), any()) } throws NaraApiException("HTTP 500", retryable = true)
+        every { discordNotifier.sendAlert(any(), any(), any(), any()) } throws RuntimeException("디스코드 다운")
+
+        runBid(props = testProperties(bidAlertAfterFailures = 1))
+
+        assertThat(state.alertSent).isTrue()
     }
 
     @Test

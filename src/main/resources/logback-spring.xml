@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <springProperty name="DISCORD_WEBHOOK_URL" source="nara.discord.webhook-url" defaultValue=""/>
+
+    <appender name="DISCORD" class="com.narareminder.alert.DiscordErrorAppender">
+        <webhookUrl>${DISCORD_WEBHOOK_URL}</webhookUrl>
+    </appender>
+
+    <!-- 디스코드 전송이 느려도 로깅 호출 스레드를 막지 않도록 비동기로 보낸다 -->
+    <appender name="ASYNC_DISCORD" class="ch.qos.logback.classic.AsyncAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="DISCORD"/>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_DISCORD"/>
+    </root>
+</configuration>

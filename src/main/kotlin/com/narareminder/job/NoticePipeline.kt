@@ -1,5 +1,7 @@
 package com.narareminder.job
 
+import com.narareminder.alert.AlertMarkers
+import com.narareminder.alert.DiscordNotifier
 import com.narareminder.client.NaraApiClient
 import com.narareminder.config.NaraProperties
 import com.narareminder.filter.FilterService
@@ -27,6 +29,7 @@ class NoticePipeline(
     private val notifiedNoticeRepository: NotifiedNoticeRepository,
     private val jobStateRepository: JobStateRepository,
     private val mailNotifier: MailNotifier,
+    private val discordNotifier: DiscordNotifier,
     private val filterService: FilterService,
     private val jobRunRepository: JobRunRepository,
     private val props: NaraProperties,
@@ -81,7 +84,7 @@ class NoticePipeline(
                 state.recordSuccess(now)
             } else {
                 state.recordFailure()
-                log.error("[{}] 수집 실패 ({}회 연속): {}", job, state.consecutiveFailures, errors)
+                log.error(AlertMarkers.HANDLED_BY_JOB_ALERT, "[{}] 수집 실패 ({}회 연속): {}", job, state.consecutiveFailures, errors)
                 alertIfNeeded(job, state, settings, errors)
             }
             recordRun(job, now, window, fetched.size, newNotices.size, sentCount, errors)
@@ -124,12 +127,22 @@ class NoticePipeline(
 
     private fun alertIfNeeded(job: JobName, state: JobState, settings: NaraProperties.Job, errors: List<String>) {
         if (!state.shouldAlert(settings.alertAfterFailures)) return
-        try {
-            mailNotifier.sendAlert(job, state.consecutiveFailures, state.lastSuccessAt, errors.joinToString("\n"))
-            state.markAlertSent()
+        val message = errors.joinToString("\n")
+        val mailSent = try {
+            mailNotifier.sendAlert(job, state.consecutiveFailures, state.lastSuccessAt, message)
+            true
         } catch (e: Exception) {
             log.error("[{}] 에러 알림 메일 발송 실패", job, e)
+            false
         }
+        val discordSent = try {
+            discordNotifier.sendAlert(job, state.consecutiveFailures, state.lastSuccessAt, message)
+        } catch (e: Exception) {
+            log.error("[{}] 에러 알림 디스코드 발송 실패", job, e)
+            false
+        }
+        // 한 채널이라도 전달됐으면 같은 장애로 다시 알리지 않는다
+        if (mailSent || discordSent) state.markAlertSent()
     }
 
     private fun NaraProperties.settingsOf(job: JobName): NaraProperties.Job = when (job) {

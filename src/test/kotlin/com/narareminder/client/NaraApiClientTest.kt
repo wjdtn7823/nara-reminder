@@ -203,4 +203,36 @@ class NaraApiClientTest {
             .hasMessageContaining("400")
         assertThat(server.requestCount).isEqualTo(1)
     }
+
+    @Test
+    fun `항목당 5KB인 100건 페이지도 256KB 버퍼 한도 없이 파싱한다`() = runBlocking<Unit> {
+        val filler = "가".repeat(1_700)
+        val items = (1..100).joinToString(",") {
+            """{"bidNtceNo":"N$it","bidNtceOrd":"000","bidNtceNm":"공고 $it","rgstDt":"2026-10-24 13:10:00","dummy":"$filler"}"""
+        }
+        server.enqueue(
+            json("""{"response":{"header":{"resultCode":"00","resultMsg":"정상"},"body":{"items":[$items],"numOfRows":100,"pageNo":1,"totalCount":100}}}"""),
+        )
+
+        val notices = client().fetch(NoticeSource.BID, NoticeCategory.SERVICE, from, to)
+
+        assertThat(notices).hasSize(100)
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `타임아웃 실패 메시지에 원인 클래스명이 있고 서비스키는 없다`() {
+        server.enqueue(json(page(1, "A")).setBodyDelay(3, java.util.concurrent.TimeUnit.SECONDS))
+        val base = testProperties(baseUrl = server.url("/1230000").toString(), serviceKey = "test-key")
+        val shortTimeout = NaraApiClient(
+            WebClient.builder(),
+            base.copy(api = base.api.copy(timeout = java.time.Duration.ofMillis(200)), retryDelays = emptyList()),
+            jacksonObjectMapper(),
+        )
+
+        assertThatThrownBy { runBlocking { shortTimeout.fetch(NoticeSource.BID, NoticeCategory.SERVICE, from, to) } }
+            .isInstanceOf(NaraApiException::class.java)
+            .hasMessageContaining("TimeoutException")
+            .satisfies({ assertThat(it.message).doesNotContain("test-key") })
+    }
 }

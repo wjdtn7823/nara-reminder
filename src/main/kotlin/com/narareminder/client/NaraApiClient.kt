@@ -7,6 +7,7 @@ import com.narareminder.notice.Notice
 import com.narareminder.notice.NoticeCategory
 import com.narareminder.notice.NoticeSource
 import com.narareminder.support.retrying
+import org.springframework.core.NestedExceptionUtils
 import org.springframework.http.client.reactive.ReactorClientHttpConnector
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -25,6 +26,7 @@ class NaraApiClient(
 ) {
     private val webClient = webClientBuilder
         .baseUrl(props.api.baseUrl)
+        .codecs { it.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES) }
         .clientConnector(ReactorClientHttpConnector(HttpClient.create().responseTimeout(props.api.timeout)))
         .build()
 
@@ -71,11 +73,25 @@ class NaraApiClient(
                 .retrieve()
                 .awaitBody<String>()
         } catch (e: WebClientResponseException) {
-            throw NaraApiException("HTTP ${e.statusCode.value()}", retryable = !e.statusCode.is4xxClientError, cause = e)
+            throw NaraApiException("HTTP ${e.statusCode.value()}${causeSuffix(e)}", retryable = !e.statusCode.is4xxClientError, cause = e)
         } catch (e: WebClientRequestException) {
-            throw NaraApiException("요청 실패: ${e.message}", retryable = true, cause = e)
+            throw NaraApiException("요청 실패: ${causeName(e)}", retryable = true, cause = e)
         }
         return parsePage(body)
+    }
+
+    // 예외 자체의 message 에는 serviceKey 가 포함된 전체 URL 이 들어 있으므로 원인 예외의 message 만 사용한다
+    private fun rootCause(e: Exception): Throwable? = NestedExceptionUtils.getMostSpecificCause(e).takeIf { it !== e }
+
+    private fun causeSuffix(e: Exception): String =
+        rootCause(e)?.let { " (${describe(it)})" }.orEmpty()
+
+    private fun causeName(e: Exception): String = describe(rootCause(e) ?: e, withMessage = false)
+
+    private fun describe(t: Throwable, withMessage: Boolean = true): String {
+        val name = t.javaClass.simpleName
+        val message = t.message?.takeIf { withMessage }
+        return if (message == null) name else "$name: $message"
     }
 
     // 공공데이터포털은 인증·파라미터 오류를 HTTP 200 + response 키가 없는 별도 JSON(또는 XML)으로 돌려준다
@@ -106,6 +122,8 @@ class NaraApiClient(
     private data class Page(val items: List<JsonNode>, val totalCount: Int)
 
     companion object {
+        // 입찰공고 1건이 약 5KB(113필드)라 기본 256KB 버퍼로는 페이지 하나도 못 받는다
+        private const val MAX_RESPONSE_BYTES = 16 * 1024 * 1024
         private const val INQUIRY_BY_REGISTERED_AT = "1"
         private const val RESULT_OK = "00"
         private const val RESULT_NO_DATA = "03"

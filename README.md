@@ -37,6 +37,20 @@ docker compose logs -f app
 - 서버가 멈췄다 재시작되면 마지막 성공 시각부터(최대 7일) 이어서 조회한다.
 - `docker compose down -v` 는 발송 이력(pgdata 볼륨)을 지워 중복 메일이 발생하므로 쓰지 않는다.
 
+## 배포 (Azure VM)
+
+`master`에 push(PR 머지)하면 GitHub Actions `Deploy` 워크플로가 자동으로 배포한다.
+
+1. 테스트 → Docker 이미지 빌드 → `ghcr.io/wjdtn7823/nara-reminder:latest` 푸시
+2. `production` 환경(`master` 브랜치만 허용)에서 OIDC로 Azure에 로그인
+3. `az vm run-command`로 VM에서 `deploy/remote-deploy.sh` 실행(`git pull` → `docker compose pull` → `up -d`)
+
+- VM에는 인바운드 SSH(22)를 열지 않는다. 관리 명령도 `az vm run-command invoke` 또는 포털의 "명령 실행"으로 한다.
+- VM 경로: `/opt/nara-reminder`. 비밀값은 VM의 `/opt/nara-reminder/.env`(root 전용, 권한 600)에만 있다.
+- 필터 변경: `config/application.yml`을 수정해 `master`에 머지하면 배포 시 반영된다.
+- 수동 재배포: Actions 탭에서 `Deploy` → "Run workflow" (`master`만 가능).
+- 롤백: VM에서 `docker compose` 이미지 태그를 이전 커밋 SHA(`ghcr.io/wjdtn7823/nara-reminder:<sha>`)로 지정해 실행한다.
+
 ## 개발
 
 ```bash

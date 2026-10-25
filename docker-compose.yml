@@ -16,6 +16,8 @@ services:
     restart: unless-stopped
 
   app:
+    # 운영 VM 은 GitHub Actions 가 빌드한 이미지를 받아 실행하고, 로컬은 build 로 직접 빌드한다
+    image: ghcr.io/wjdtn7823/nara-reminder:latest
     build: .
     env_file: .env
     environment:

@@ -45,7 +45,7 @@ export function RunsPage() {
         <table>
           <thead>
             <tr>
-              <th>시작 (KST)</th><th>작업</th><th>조회 구간</th><th>조회 → 통과 → 발송</th><th>상태</th><th>소요</th><th>오류</th>
+              <th>시작 (KST)</th><th>작업</th><th>조회 → 통과 → 발송</th><th>상태</th><th>소요</th><th>오류</th>
             </tr>
           </thead>
           <tbody>
@@ -53,7 +53,6 @@ export function RunsPage() {
               <tr key={run.id}>
                 <td>{formatKst(run.startedAt)}</td>
                 <td>{JOB_LABELS[run.jobName]}</td>
-                <td>{formatKst(run.windowFrom)} ~ {formatKst(run.windowTo)}</td>
                 <td>{`${run.fetchedCount} → ${run.matchedCount} → ${run.sentCount}`}</td>
                 <td><span className={`badge ${run.status.toLowerCase()}`}>{STATUS_LABELS[run.status]}</span></td>
                 <td>{formatDuration(run.startedAt, run.finishedAt)}</td>

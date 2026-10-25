@@ -29,6 +29,14 @@ describe('RunsPage', () => {
     expect(within(row).getAllByText(/SMTP 오류/).length).toBeGreaterThan(0)
   })
 
+  it('배치 동작 확인용이라 조회 구간은 보여 주지 않는다', async () => {
+    vi.mocked(fetchRuns).mockResolvedValue(page([run]))
+    render(<RunsPage />)
+    const row = await screen.findByRole('row', { name: /40 → 3 → 0/ })
+    expect(screen.queryByRole('columnheader', { name: '조회 구간' })).not.toBeInTheDocument()
+    expect(within(row).queryByText(/13:25/)).not.toBeInTheDocument()
+  })
+
   it('작업을 바꾸면 첫 페이지부터 다시 조회한다', async () => {
     vi.mocked(fetchRuns).mockResolvedValue(page([run], 3))
     render(<RunsPage />)

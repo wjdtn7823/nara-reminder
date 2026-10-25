@@ -95,7 +95,7 @@ nara:
   service-key: ${NARA_SERVICE_KEY}
   mail:
     from: ${MAIL_FROM}
-    to: [wjdtn7823@gmail.com]
+    to: [me@example.com]
   bid:
     poll-interval: 5m
     overlap: 30m              # 조회 구간 겹침

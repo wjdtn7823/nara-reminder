@@ -47,7 +47,7 @@ docker compose logs -f app
 
 `master`에 push(PR 머지)하면 GitHub Actions `Deploy` 워크플로가 자동으로 배포한다.
 
-1. 테스트 → Docker 이미지 빌드 → `ghcr.io/wjdtn7823/nara-reminder:latest` 푸시
+1. 테스트(백엔드 + 어드민) → Docker 이미지 빌드 → `ghcr.io/wjdtn7823/nara-reminder:latest`, `ghcr.io/wjdtn7823/nara-reminder-web:latest` 푸시
 2. `production` 환경(`master` 브랜치만 허용)에서 OIDC로 Azure에 로그인
 3. `az vm run-command`로 VM에서 `deploy/remote-deploy.sh` 실행(`git pull` → `docker compose pull` → `up -d`)
 
@@ -55,7 +55,7 @@ docker compose logs -f app
 - VM 경로: `/opt/nara-reminder`. 비밀값은 VM의 `/opt/nara-reminder/.env`(root 전용, 권한 600)에만 있다.
 - 필터 변경: 어드민 화면에서 한다.
 - 수동 재배포: Actions 탭에서 `Deploy` → "Run workflow" (`master`만 가능).
-- 롤백: VM에서 `docker compose` 이미지 태그를 이전 커밋 SHA(`ghcr.io/wjdtn7823/nara-reminder:<sha>`)로 지정해 실행한다.
+- 롤백: VM에서 `docker compose` 이미지 태그를 이전 커밋 SHA(`ghcr.io/wjdtn7823/nara-reminder:<sha>`, `ghcr.io/wjdtn7823/nara-reminder-web:<sha>`)로 지정해 실행한다.
 
 ## 개발
 

@@ -7,13 +7,15 @@ git fetch -q origin master
 git checkout -q master
 git reset -q --hard origin/master
 
+docker compose pull app web
+
 # 호스트에 직접 설치했던 Caddy 는 web 컨테이너로 대체한다 (80/443 충돌 방지, 1회성)
-if systemctl list-unit-files caddy.service > /dev/null 2>&1 && systemctl is-enabled --quiet caddy 2>/dev/null; then
+# 이미지를 받은 뒤에 전환해야 pull 실패 시 서비스 공백이 생기지 않는다
+if systemctl is-active --quiet caddy 2>/dev/null || systemctl is-enabled --quiet caddy 2>/dev/null; then
   systemctl disable --now caddy
-  DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq caddy > /dev/null
+  DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 remove -y -qq caddy > /dev/null
 fi
 
-docker compose pull app web
 docker compose up -d --no-build
 docker image prune -f > /dev/null
 

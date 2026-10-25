@@ -47,7 +47,7 @@ class NoticePipeline(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    errors += "${category.label} 조회 실패: ${e.message}"
+                    errors += "${category.label} 조회 실패: ${e.message ?: e.javaClass.simpleName}"
                     emptyList()
                 }
             }
@@ -57,7 +57,7 @@ class NoticePipeline(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                errors += "발송 이력 조회 실패: ${e.message}"
+                errors += "발송 이력 조회 실패: ${e.message ?: e.javaClass.simpleName}"
                 emptyList()
             }
             if (newNotices.isNotEmpty()) {
@@ -67,7 +67,7 @@ class NoticePipeline(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    errors += "메일 발송/기록 실패: ${e.message}"
+                    errors += "메일 발송/기록 실패: ${e.message ?: e.javaClass.simpleName}"
                 }
             }
 

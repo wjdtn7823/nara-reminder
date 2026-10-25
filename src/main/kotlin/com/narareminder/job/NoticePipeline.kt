@@ -2,6 +2,7 @@ package com.narareminder.job
 
 import com.narareminder.client.NaraApiClient
 import com.narareminder.config.NaraProperties
+import com.narareminder.filter.FilterService
 import com.narareminder.mail.MailNotifier
 import com.narareminder.notice.Notice
 import com.narareminder.notice.matches
@@ -26,6 +27,7 @@ class NoticePipeline(
     private val notifiedNoticeRepository: NotifiedNoticeRepository,
     private val jobStateRepository: JobStateRepository,
     private val mailNotifier: MailNotifier,
+    private val filterService: FilterService,
     private val props: NaraProperties,
     private val clock: Clock,
 ) {
@@ -35,13 +37,14 @@ class NoticePipeline(
     suspend fun run(job: JobName) {
         // JPA·SMTP 블로킹 호출이 WebClient 이벤트 루프 스레드에서 실행되지 않도록 IO 디스패처로 옮긴다
         withContext(Dispatchers.IO) {
+            val filter = filterService.current()
             val settings = props.settingsOf(job)
             val now = clock.instant()
             val state = jobStateRepository.findByIdOrNull(job) ?: JobState(job)
             val window = QueryWindow.of(state.lastSuccessAt, now, settings)
             val errors = mutableListOf<String>()
 
-            val fetched = props.filter.categories.flatMap { category ->
+            val fetched = filter.categories.flatMap { category ->
                 try {
                     client.fetch(job.source, category, window.from.toKst(), window.to.toKst())
                 } catch (e: CancellationException) {
@@ -53,7 +56,7 @@ class NoticePipeline(
             }
 
             val newNotices = try {
-                excludeNotified(fetched.filter { props.filter.matches(it) })
+                excludeNotified(fetched.filter { filter.matches(it) })
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

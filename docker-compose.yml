@@ -23,9 +23,6 @@ services:
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/nara
       TZ: Asia/Seoul
-    volumes:
-      # 필터 설정은 재빌드 없이 수정 후 `docker compose restart app` 으로 반영한다
-      - ./config/application.yml:/app/config/application.yml:ro
     depends_on:
       postgres:
         condition: service_healthy

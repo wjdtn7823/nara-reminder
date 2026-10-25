@@ -1,13 +1,11 @@
 package com.narareminder.config
 
-import com.narareminder.notice.NoticeCategory
 import java.time.Duration
 
 fun testProperties(
     baseUrl: String = "http://localhost",
     serviceKey: String = "test-key",
     pageSize: Int = 100,
-    filter: NaraProperties.Filter = NaraProperties.Filter(categories = listOf(NoticeCategory.SERVICE)),
     bidAlertAfterFailures: Int = 6,
 ) = NaraProperties(
     serviceKey = serviceKey,
@@ -25,6 +23,5 @@ fun testProperties(
         alertAfterFailures = 1,
     ),
     api = NaraProperties.Api(baseUrl = baseUrl, pageSize = pageSize, timeout = Duration.ofSeconds(2)),
-    filter = filter,
     retryDelays = listOf(Duration.ZERO, Duration.ZERO, Duration.ZERO),
 )

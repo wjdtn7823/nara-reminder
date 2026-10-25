@@ -4,7 +4,9 @@ import com.narareminder.client.NaraApiClient
 import com.narareminder.client.NaraApiException
 import com.narareminder.config.NaraProperties
 import com.narareminder.config.testProperties
+import com.narareminder.filter.FilterService
 import com.narareminder.mail.MailNotifier
+import com.narareminder.notice.FilterCriteria
 import com.narareminder.notice.Notice
 import com.narareminder.notice.NoticeCategory
 import com.narareminder.notice.NoticeSource
@@ -37,13 +39,18 @@ class NoticePipelineTest {
     private val mailNotifier = mockk<MailNotifier>(relaxed = true)
     private val state = JobState(JobName.BID_POLLING)
 
-    private val aiFilter = NaraProperties.Filter(keywords = listOf("AI"), categories = listOf(NoticeCategory.SERVICE))
+    private val filterService = mockk<FilterService>()
+    private val aiFilter = FilterCriteria(keywords = listOf("AI"), categories = listOf(NoticeCategory.SERVICE))
 
-    private fun pipeline(props: NaraProperties = testProperties(filter = aiFilter)) =
-        NoticePipeline(client, notifiedNoticeRepository, jobStateRepository, mailNotifier, props, Clock.fixed(now, KST))
+    private fun pipeline(filter: FilterCriteria = aiFilter, props: NaraProperties = testProperties()): NoticePipeline {
+        every { filterService.current() } returns filter
+        return NoticePipeline(
+            client, notifiedNoticeRepository, jobStateRepository, mailNotifier, filterService, props, Clock.fixed(now, KST),
+        )
+    }
 
-    private fun runBid(props: NaraProperties = testProperties(filter = aiFilter)) =
-        runBlocking { pipeline(props).run(JobName.BID_POLLING) }
+    private fun runBid(filter: FilterCriteria = aiFilter, props: NaraProperties = testProperties()) =
+        runBlocking { pipeline(filter, props).run(JobName.BID_POLLING) }
 
     private fun sentNoticeNos(): List<String> {
         val captured = mutableListOf<List<Notice>>()
@@ -53,6 +60,7 @@ class NoticePipelineTest {
 
     @BeforeEach
     fun setUp() {
+        every { filterService.current() } returns aiFilter
         every { jobStateRepository.findById(JobName.BID_POLLING) } returns Optional.of(state)
         every { jobStateRepository.save(any<JobState>()) } answers { firstArg() }
         every { notifiedNoticeRepository.findAllById(any()) } returns emptyList()
@@ -135,15 +143,13 @@ class NoticePipelineTest {
 
     @Test
     fun `일부 업무구분만 실패하면 성공분은 보내고 실행은 실패로 처리한다`() {
-        val props = testProperties(
-            filter = aiFilter.copy(categories = listOf(NoticeCategory.SERVICE, NoticeCategory.GOODS)),
-        )
+        val filter = aiFilter.copy(categories = listOf(NoticeCategory.SERVICE, NoticeCategory.GOODS))
         coEvery { client.fetch(NoticeSource.BID, NoticeCategory.SERVICE, any(), any()) } returns
             listOf(aNotice(noticeNo = "N1", title = "AI 플랫폼"))
         coEvery { client.fetch(NoticeSource.BID, NoticeCategory.GOODS, any(), any()) } throws
             NaraApiException("HTTP 500", retryable = true)
 
-        runBid(props)
+        runBid(filter = filter)
 
         assertThat(sentNoticeNos()).containsExactly("N1")
         verify { notifiedNoticeRepository.saveAll(any<List<NotifiedNotice>>()) }
@@ -154,13 +160,13 @@ class NoticePipelineTest {
     @Test
     fun `연속 실패가 임계치에 도달하면 에러 알림을 한 번만 보낸다`() {
         coEvery { client.fetch(any(), any(), any(), any()) } throws NaraApiException("결과코드 30: 키 오류", retryable = false)
-        val props = testProperties(filter = aiFilter, bidAlertAfterFailures = 2)
+        val props = testProperties(bidAlertAfterFailures = 2)
 
-        runBid(props)
+        runBid(props = props)
         verify(exactly = 0) { mailNotifier.sendAlert(any(), any(), any(), any()) }
 
-        runBid(props)
-        runBid(props)
+        runBid(props = props)
+        runBid(props = props)
 
         verify(exactly = 1) {
             mailNotifier.sendAlert(JobName.BID_POLLING, 2, null, match { it.contains("결과코드 30") })
@@ -173,9 +179,9 @@ class NoticePipelineTest {
     fun `에러 알림 발송이 실패하면 다음 실패 때 다시 시도한다`() {
         coEvery { client.fetch(any(), any(), any(), any()) } throws NaraApiException("HTTP 500", retryable = true)
         every { mailNotifier.sendAlert(any(), any(), any(), any()) } throws RuntimeException("SMTP 오류")
-        val props = testProperties(filter = aiFilter, bidAlertAfterFailures = 1)
+        val props = testProperties(bidAlertAfterFailures = 1)
 
-        runBid(props)
+        runBid(props = props)
 
         assertThat(state.alertSent).isFalse()
         assertThat(state.consecutiveFailures).isEqualTo(1)
@@ -205,5 +211,15 @@ class NoticePipelineTest {
         assertThat(state.consecutiveFailures).isEqualTo(1)
         assertThat(state.lastSuccessAt).isNull()
         verify { jobStateRepository.save(state) }
+    }
+
+    @Test
+    fun `매 실행마다 DB 필터를 다시 읽는다`() {
+        coEvery { client.fetch(any(), any(), any(), any()) } returns emptyList()
+
+        runBid()
+        runBid()
+
+        verify(exactly = 2) { filterService.current() }
     }
 }

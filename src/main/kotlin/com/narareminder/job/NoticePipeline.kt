@@ -28,6 +28,7 @@ class NoticePipeline(
     private val jobStateRepository: JobStateRepository,
     private val mailNotifier: MailNotifier,
     private val filterService: FilterService,
+    private val jobRunRepository: JobRunRepository,
     private val props: NaraProperties,
     private val clock: Clock,
 ) {
@@ -63,10 +64,12 @@ class NoticePipeline(
                 errors += "발송 이력 조회 실패: ${e.message ?: e.javaClass.simpleName}"
                 emptyList()
             }
+            var sentCount = 0
             if (newNotices.isNotEmpty()) {
                 try {
                     retrying(props.retryDelays) { mailNotifier.sendNotices(job.source, newNotices, now) }
                     notifiedNoticeRepository.saveAll(newNotices.map { NotifiedNotice(it.notifiedId(), it.title, now) })
+                    sentCount = newNotices.size
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -81,6 +84,7 @@ class NoticePipeline(
                 log.error("[{}] 수집 실패 ({}회 연속): {}", job, state.consecutiveFailures, errors)
                 alertIfNeeded(job, state, settings, errors)
             }
+            recordRun(job, now, window, fetched.size, newNotices.size, sentCount, errors)
             try {
                 jobStateRepository.save(state)
             } catch (e: CancellationException) {
@@ -89,6 +93,26 @@ class NoticePipeline(
                 log.error("[{}] 작업 상태 저장 실패", job, e)
                 throw e
             }
+        }
+    }
+
+    // 실행 이력은 조회용 부가 정보라 저장에 실패해도 수집 결과에는 영향을 주지 않는다
+    private fun recordRun(
+        job: JobName, startedAt: Instant, window: QueryWindow,
+        fetchedCount: Int, matchedCount: Int, sentCount: Int, errors: List<String>,
+    ) {
+        try {
+            jobRunRepository.save(
+                JobRun(
+                    jobName = job, startedAt = startedAt, finishedAt = clock.instant(),
+                    windowFrom = window.from, windowTo = window.to,
+                    fetchedCount = fetchedCount, matchedCount = matchedCount, sentCount = sentCount,
+                    status = if (errors.isEmpty()) JobRunStatus.SUCCESS else JobRunStatus.FAILURE,
+                    error = errors.takeIf { it.isNotEmpty() }?.joinToString("\n"),
+                ),
+            )
+        } catch (e: Exception) {
+            log.error("[{}] 실행 이력 저장 실패", job, e)
         }
     }
 

@@ -40,12 +40,14 @@ class NoticePipelineTest {
     private val state = JobState(JobName.BID_POLLING)
 
     private val filterService = mockk<FilterService>()
+    private val jobRunRepository = mockk<JobRunRepository>()
+    private val runs = mutableListOf<JobRun>()
     private val aiFilter = FilterCriteria(keywords = listOf("AI"), categories = listOf(NoticeCategory.SERVICE))
 
     private fun pipeline(filter: FilterCriteria = aiFilter, props: NaraProperties = testProperties()): NoticePipeline {
         every { filterService.current() } returns filter
         return NoticePipeline(
-            client, notifiedNoticeRepository, jobStateRepository, mailNotifier, filterService, props, Clock.fixed(now, KST),
+            client, notifiedNoticeRepository, jobStateRepository, mailNotifier, filterService, jobRunRepository, props, Clock.fixed(now, KST),
         )
     }
 
@@ -61,10 +63,58 @@ class NoticePipelineTest {
     @BeforeEach
     fun setUp() {
         every { filterService.current() } returns aiFilter
+        every { jobRunRepository.save(capture(runs)) } answers { firstArg() }
         every { jobStateRepository.findById(JobName.BID_POLLING) } returns Optional.of(state)
         every { jobStateRepository.save(any<JobState>()) } answers { firstArg() }
         every { notifiedNoticeRepository.findAllById(any()) } returns emptyList()
         every { notifiedNoticeRepository.saveAll(any<List<NotifiedNotice>>()) } answers { firstArg() }
+    }
+
+    @Test
+    fun `성공한 실행은 건수와 함께 이력 1행을 남긴다`() {
+        coEvery { client.fetch(any(), any(), any(), any()) } returns listOf(
+            aNotice(noticeNo = "N1", title = "AI 플랫폼"),
+            aNotice(noticeNo = "N2", title = "청사 청소"),
+        )
+
+        runBid()
+
+        with(runs.single()) {
+            assertThat(jobName).isEqualTo(JobName.BID_POLLING)
+            assertThat(status).isEqualTo(JobRunStatus.SUCCESS)
+            assertThat(fetchedCount).isEqualTo(2)
+            assertThat(matchedCount).isEqualTo(1)
+            assertThat(sentCount).isEqualTo(1)
+            assertThat(windowFrom).isEqualTo(now.minus(java.time.Duration.ofHours(1)))
+            assertThat(windowTo).isEqualTo(now)
+            assertThat(error).isNull()
+        }
+    }
+
+    @Test
+    fun `실패한 실행은 오류와 함께 이력을 남기고 발송 건수는 0이다`() {
+        coEvery { client.fetch(any(), any(), any(), any()) } returns listOf(aNotice(title = "AI 플랫폼"))
+        every { mailNotifier.sendNotices(any(), any(), any()) } throws RuntimeException("SMTP 오류")
+
+        runBid()
+
+        with(runs.single()) {
+            assertThat(status).isEqualTo(JobRunStatus.FAILURE)
+            assertThat(matchedCount).isEqualTo(1)
+            assertThat(sentCount).isZero()
+            assertThat(error).contains("SMTP 오류")
+        }
+    }
+
+    @Test
+    fun `실행 이력 저장이 실패해도 작업 상태는 저장된다`() {
+        coEvery { client.fetch(any(), any(), any(), any()) } returns emptyList()
+        every { jobRunRepository.save(any<JobRun>()) } throws RuntimeException("DB 오류")
+
+        runBid()
+
+        verify { jobStateRepository.save(state) }
+        assertThat(state.lastSuccessAt).isEqualTo(now)
     }
 
     @Test

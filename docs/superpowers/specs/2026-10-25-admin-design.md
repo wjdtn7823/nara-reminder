@@ -44,9 +44,9 @@
 
 ### 백엔드 변경
 
-- 의존성 추가: `spring-boot-starter-web`, `spring-boot-starter-validation`. Spring Security 는 추가하지 않는다.
+- 의존성 추가: `spring-boot-starter-web`. Spring Security·Bean Validation 은 추가하지 않는다(검증은 `FilterService` 에서 직접).
 - `spring.main.web-application-type: none` 제거, `server.port: 8080`.
-- 컨트롤러는 suspend 함수, JPA 접근은 `Dispatchers.IO`.
+- 컨트롤러는 일반 함수(MVC 요청 스레드에서 JPA 직접 호출). 코루틴은 기존 수집 파이프라인에만 쓴다.
 
 ### 보안 (인증 외)
 

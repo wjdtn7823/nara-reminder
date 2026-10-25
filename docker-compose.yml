@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nara
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d nara"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    # 운영 VM 은 GitHub Actions 가 빌드한 이미지를 받아 실행하고, 로컬은 build 로 직접 빌드한다
+    image: ghcr.io/wjdtn7823/nara-reminder:latest
+    build: .
+    env_file: .env
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/nara
+      TZ: Asia/Seoul
+    volumes:
+      # 필터 설정은 재빌드 없이 수정 후 `docker compose restart app` 으로 반영한다
+      - ./config/application.yml:/app/config/application.yml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

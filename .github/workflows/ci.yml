@@ -19,3 +19,21 @@ jobs:
           cache: gradle
       - name: 테스트
         run: ./gradlew test --no-daemon
+
+  admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+      - run: npm ci
+      - name: 테스트
+        run: npm test
+      - name: 빌드
+        run: npm run build

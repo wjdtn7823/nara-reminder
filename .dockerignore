@@ -4,3 +4,5 @@
 build
 .env
 .idea
+admin/node_modules
+admin/dist

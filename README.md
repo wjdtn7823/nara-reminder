@@ -14,14 +14,13 @@
 
 ```bash
 cp .env.example .env   # 값 채우기
-vi config/application.yml   # 필터 조건 수정
 docker compose up -d --build
 docker compose logs -f app
 ```
 
-필터를 바꾼 뒤에는 `docker compose restart app` 으로 반영한다.
-
 ## 필터 규칙
+
+필터는 어드민 화면(`https://<도메인>/filters`)에서 관리하며 저장 즉시 다음 수집부터 적용된다. DB(`filter_term`, `filter_setting`)에 저장된다.
 
 - `keywords`(공고명) **또는** `agencies`(수요기관) 중 하나만 맞아도 받는다. 둘 다 비어 있으면 전부 받는다.
 - 위를 통과한 공고 중 `exclude-keywords`가 공고명에 있으면 제외하고, 가격 범위를 벗어나면 제외한다.
@@ -29,6 +28,13 @@ docker compose logs -f app
 - `categories`: `GOODS`(물품) `SERVICE`(용역) `CONSTRUCTION`(공사) `FOREIGN`(외자)
 - `price-min` / `price-max`: 입찰공고는 추정가격, 사전규격은 배정예산 기준(이상/이하). 가격이 없는 공고는 통과
 - `agencies`: 입찰공고는 수요기관, 사전규격은 실수요기관 기준
+
+## 어드민 화면
+
+- `https://<SITE_ADDRESS>/filters` — 키워드·수요기관·제외 키워드 등록/수정/삭제, 업무구분·가격 범위
+- `https://<SITE_ADDRESS>/runs` — 배치 실행 이력(90일 보관)
+- 인증이 없다. 주소를 아는 누구나 필터를 바꿀 수 있으므로, 필요해지면 `web/Caddyfile` 에 `basic_auth` 를 추가한다.
+- 로컬 개발: 앱을 8080 으로 띄운 뒤 `cd admin && npm install && npm run dev` (Vite 가 `/api` 를 8080 으로 프록시)
 
 ## 운영 참고
 
@@ -47,7 +53,7 @@ docker compose logs -f app
 
 - VM에는 인바운드 SSH(22)를 열지 않는다. 관리 명령도 `az vm run-command invoke` 또는 포털의 "명령 실행"으로 한다.
 - VM 경로: `/opt/nara-reminder`. 비밀값은 VM의 `/opt/nara-reminder/.env`(root 전용, 권한 600)에만 있다.
-- 필터 변경: `config/application.yml`을 수정해 `master`에 머지하면 배포 시 반영된다.
+- 필터 변경: 어드민 화면에서 한다.
 - 수동 재배포: Actions 탭에서 `Deploy` → "Run workflow" (`master`만 가능).
 - 롤백: VM에서 `docker compose` 이미지 태그를 이전 커밋 SHA(`ghcr.io/wjdtn7823/nara-reminder:<sha>`)로 지정해 실행한다.
 

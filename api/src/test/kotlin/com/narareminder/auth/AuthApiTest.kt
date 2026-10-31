@@ -2,6 +2,8 @@ package com.narareminder.auth
 
 import com.narareminder.PostgresTestConfig
 import com.narareminder.support.authAs
+import com.narareminder.support.withXsrf
+import com.narareminder.support.xsrfCookie
 import com.narareminder.user.AppUserRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -9,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
-import jakarta.servlet.http.Cookie
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpSession
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -35,16 +36,11 @@ class AuthApiTest @Autowired constructor(
     private fun member(email: String = "member@example.com", password: String? = "correct-horse") =
         accountService.create(email, password?.let { passwordEncoder.encode(it) }, admin = false)
 
-    // 운영과 같은 경로: GET 으로 XSRF-TOKEN 쿠키를 받아 쿠키와 X-XSRF-TOKEN 헤더로 돌려보낸다
-    private fun xsrfCookie(): Cookie =
-        requireNotNull(mockMvc.get("/api/me").andReturn().response.getCookie("XSRF-TOKEN"))
-
     private fun login(email: String, password: String, session: MockHttpSession = MockHttpSession()): ResultActionsDsl {
-        val xsrf = xsrfCookie()
+        val xsrf = mockMvc.xsrfCookie()
         return mockMvc.post("/api/auth/login") {
             this.session = session
-            cookie(xsrf)
-            header("X-XSRF-TOKEN", xsrf.value)
+            withXsrf(xsrf)
             contentType = MediaType.APPLICATION_JSON
             content = """{"email":"$email","password":"$password"}"""
         }
@@ -134,11 +130,10 @@ class AuthApiTest @Autowired constructor(
         val session = MockHttpSession()
         login("member@example.com", "correct-horse", session).andExpect { status { isOk() } }
 
-        val xsrf = xsrfCookie()
+        val xsrf = mockMvc.xsrfCookie()
         mockMvc.post("/api/auth/logout") {
             this.session = session
-            cookie(xsrf)
-            header("X-XSRF-TOKEN", xsrf.value)
+            withXsrf(xsrf)
         }.andExpect { status { isOk() } }
 
         mockMvc.get("/api/me") { this.session = session }.andExpect { status { isUnauthorized() } }

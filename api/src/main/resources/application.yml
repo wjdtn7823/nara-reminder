@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: nara-reminder-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nara}
+    username: ${DB_USERNAME:nara}
+    password: ${DB_PASSWORD:nara}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+server:
+  port: 8080
+  error:
+    include-stacktrace: never
+
+nara:
+  # logback-spring.xml 의 ERROR 로그 디스코드 전송에 쓴다
+  discord:
+    webhook-url: ${DISCORD_WEBHOOK_URL:}

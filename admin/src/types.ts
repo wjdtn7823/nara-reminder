@@ -1,3 +1,8 @@
+export interface Me {
+  email: string
+  admin: boolean
+}
+
 export type TermType = 'KEYWORD' | 'EXCLUDE_KEYWORD' | 'AGENCY'
 export type Category = 'GOODS' | 'SERVICE' | 'CONSTRUCTION' | 'FOREIGN'
 export type JobName = 'BID_POLLING' | 'PRE_SPEC_DAILY'

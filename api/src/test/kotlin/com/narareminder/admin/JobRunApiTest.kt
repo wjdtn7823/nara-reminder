@@ -1,12 +1,17 @@
-package com.narareminder.job
+package com.narareminder.admin
 
 import com.narareminder.PostgresTestConfig
+import com.narareminder.job.JobName
+import com.narareminder.job.JobRun
+import com.narareminder.job.JobRunRepository
+import com.narareminder.job.JobRunStatus
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
+import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -19,6 +24,7 @@ import java.time.Instant
 @ActiveProfiles("test")
 @Import(PostgresTestConfig::class)
 @Transactional
+@WithMockUser(roles = ["ADMIN"])
 class JobRunApiTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val repository: JobRunRepository,
@@ -46,7 +52,7 @@ class JobRunApiTest @Autowired constructor(
 
     @Test
     fun `최신순으로 조회한다`() {
-        mockMvc.get("/api/runs").andExpect {
+        mockMvc.get("/api/admin/runs").andExpect {
             status { isOk() }
             jsonPath("$.items.length()") { value(3) }
             jsonPath("$.items[0].jobName") { value("PRE_SPEC_DAILY") }
@@ -58,7 +64,7 @@ class JobRunApiTest @Autowired constructor(
 
     @Test
     fun `작업과 상태로 거른다`() {
-        mockMvc.get("/api/runs?job=BID_POLLING&status=FAILURE").andExpect {
+        mockMvc.get("/api/admin/runs?job=BID_POLLING&status=FAILURE").andExpect {
             jsonPath("$.items.length()") { value(1) }
             jsonPath("$.items[0].error") { value("용역 조회 실패: HTTP 500") }
         }
@@ -66,11 +72,17 @@ class JobRunApiTest @Autowired constructor(
 
     @Test
     fun `페이지 크기는 100을 넘지 않는다`() {
-        mockMvc.get("/api/runs?size=500&page=0").andExpect { jsonPath("$.size") { value(100) } }
+        mockMvc.get("/api/admin/runs?size=500&page=0").andExpect { jsonPath("$.size") { value(100) } }
     }
 
     @Test
     fun `잘못된 job 값은 400`() {
-        mockMvc.get("/api/runs?job=FOO").andExpect { status { isBadRequest() } }
+        mockMvc.get("/api/admin/runs?job=FOO").andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    @WithMockUser(roles = ["USER"])
+    fun `관리자가 아니면 403`() {
+        mockMvc.get("/api/admin/runs").andExpect { status { isForbidden() } }
     }
 }

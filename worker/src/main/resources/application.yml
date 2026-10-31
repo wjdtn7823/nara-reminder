@@ -33,7 +33,6 @@ nara:
     webhook-url: ${DISCORD_WEBHOOK_URL:}
   mail:
     from: ${MAIL_FROM}
-    to: ${MAIL_TO}
   bid:
     poll-interval: PT5M
     overlap: 30m

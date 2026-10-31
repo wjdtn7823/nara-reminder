@@ -39,4 +39,13 @@ class DiscordNotifierTest {
             .contains("2026-10-25 13:30")
             .contains("용역 조회 실패: HTTP 500")
     }
+
+    @Test
+    fun `임의 메시지를 그대로 보내고 웹훅이 없으면 false`() {
+        server.enqueue(MockResponse().setResponseCode(204))
+
+        assertThat(notifier(server.url("/hook").toString()).send("⚠️ 경고")).isTrue()
+        assertThat(server.takeRequest().body.readUtf8()).contains("⚠️ 경고")
+        assertThat(notifier("").send("⚠️ 경고")).isFalse()
+    }
 }

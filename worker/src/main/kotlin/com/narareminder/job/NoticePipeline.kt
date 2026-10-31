@@ -7,6 +7,7 @@ import com.narareminder.config.NaraProperties
 import com.narareminder.mail.MailNotifier
 import com.narareminder.notice.NoticeCategory
 import com.narareminder.support.KST
+import com.narareminder.user.AppUserRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -23,6 +24,7 @@ class NoticePipeline(
     private val collector: NoticeCollector,
     private val jobStateRepository: JobStateRepository,
     private val mailNotifier: MailNotifier,
+    private val userRepository: AppUserRepository,
     private val discordNotifier: DiscordNotifier,
     private val jobRunRepository: JobRunRepository,
     private val props: NaraProperties,
@@ -105,7 +107,7 @@ class NoticePipeline(
         if (!state.shouldAlert(settings.alertAfterFailures)) return
         val message = errors.joinToString("\n")
         val mailSent = try {
-            mailNotifier.sendAlert(job, state.consecutiveFailures, state.lastSuccessAt, message)
+            mailNotifier.sendAlert(userRepository.findAdmins().map { it.email }, job, state.consecutiveFailures, state.lastSuccessAt, message)
             true
         } catch (e: Exception) {
             log.error("[{}] 에러 알림 메일 발송 실패", job, e)

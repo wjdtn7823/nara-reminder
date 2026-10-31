@@ -9,6 +9,8 @@ import com.narareminder.notice.NoticeCategory
 import com.narareminder.notice.NoticeSource
 import com.narareminder.notice.aNotice
 import com.narareminder.support.KST
+import com.narareminder.user.AppUser
+import com.narareminder.user.AppUserRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -30,13 +32,14 @@ class NoticePipelineTest {
     private val collector = mockk<NoticeCollector>()
     private val jobStateRepository = mockk<JobStateRepository>()
     private val mailNotifier = mockk<MailNotifier>(relaxed = true)
+    private val userRepository = mockk<AppUserRepository> { every { findAdmins() } returns listOf(AppUser("admin@example.com", "hash", true, Instant.EPOCH)) }
     private val discordNotifier = mockk<DiscordNotifier>(relaxed = true)
     private val jobRunRepository = mockk<JobRunRepository>()
     private val state = JobState(JobName.BID_POLLING)
     private val runs = mutableListOf<JobRun>()
 
     private fun runBid(props: NaraProperties = testProperties()) = runBlocking {
-        NoticePipeline(client, collector, jobStateRepository, mailNotifier, discordNotifier, jobRunRepository, props, Clock.fixed(now, KST))
+        NoticePipeline(client, collector, jobStateRepository, mailNotifier, userRepository, discordNotifier, jobRunRepository, props, Clock.fixed(now, KST))
             .run(JobName.BID_POLLING)
     }
 
@@ -96,7 +99,7 @@ class NoticePipelineTest {
 
         runBid(testProperties(bidAlertAfterFailures = 1))
 
-        verify(exactly = 1) { mailNotifier.sendAlert(JobName.BID_POLLING, 1, null, any()) }
+        verify(exactly = 1) { mailNotifier.sendAlert(listOf("admin@example.com"), JobName.BID_POLLING, 1, null, any()) }
         verify(exactly = 1) { discordNotifier.sendAlert(JobName.BID_POLLING, 1, null, any()) }
         assertThat(state.alertSent).isTrue()
     }

@@ -1,0 +1,4 @@
+spring:
+  flyway:
+    placeholders:
+      legacyowner: legacy-owner@example.com

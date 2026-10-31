@@ -5,6 +5,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/nara}
     username: ${DB_USERNAME:nara}
     password: ${DB_PASSWORD:nara}
+  flyway:
+    placeholders:
+      # V5 이관 계정. 기존 필터가 있는 DB 에서 비어 있으면 api 가 뜨지 않는다
+      legacyowner: ${LEGACY_OWNER_EMAIL:}
   jpa:
     open-in-view: false
     hibernate:

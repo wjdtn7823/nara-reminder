@@ -1,6 +1,8 @@
 spring:
   flyway:
     enabled: true
+    placeholders:
+      legacyowner: legacy-owner@example.com
   mail:
     host: localhost
     port: 2525

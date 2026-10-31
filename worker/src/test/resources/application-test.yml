@@ -1,0 +1,17 @@
+spring:
+  flyway:
+    enabled: true
+    placeholders:
+      legacyowner: legacy-owner@example.com
+  mail:
+    host: localhost
+    port: 2525
+    username: test
+    password: test
+
+nara:
+  service-key: test-key
+  mail:
+    from: bot@example.com
+  scheduling:
+    enabled: false

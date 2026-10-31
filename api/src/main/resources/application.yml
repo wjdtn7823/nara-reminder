@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: nara-reminder-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nara}
+    username: ${DB_USERNAME:nara}
+    password: ${DB_PASSWORD:nara}
+  flyway:
+    placeholders:
+      # V5 이관 계정. 기존 필터가 있는 DB 에서 비어 있으면 api 가 뜨지 않는다
+      legacyowner: ${LEGACY_OWNER_EMAIL:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+server:
+  port: 8080
+  # Caddy 가 붙이는 X-Forwarded-Proto 로 https 를 인식해 세션·CSRF 쿠키에 Secure 를 붙인다
+  forward-headers-strategy: native
+  error:
+    include-stacktrace: never
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        http-only: true
+        same-site: lax
+
+nara:
+  # logback-spring.xml 의 ERROR 로그 디스코드 전송에 쓴다
+  discord:
+    webhook-url: ${DISCORD_WEBHOOK_URL:}
+
+app:
+  admin-email: ${ADMIN_EMAIL:}
+  base-url: ${APP_BASE_URL:http://localhost:5173}

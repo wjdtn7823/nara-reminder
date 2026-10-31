@@ -11,5 +11,5 @@ export const fetchRuns = ({ job, status, page }: RunQuery): Promise<Page<JobRun>
   const params = new URLSearchParams({ page: String(page), size: '50' })
   if (job) params.set('job', job)
   if (status) params.set('status', status)
-  return request<Page<JobRun>>(`/api/runs?${params.toString()}`)
+  return request<Page<JobRun>>(`/api/admin/runs?${params.toString()}`)
 }

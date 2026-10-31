@@ -24,3 +24,8 @@ const shortKst = new Intl.DateTimeFormat('ko-KR', {
 })
 
 export const formatKstShort = (iso: string): string => shortKst.format(new Date(iso))
+
+export const formatPrice = (won: number): string => `${won.toLocaleString('ko-KR')}원`
+
+// 서버의 LocalDateTime(시간대 없음, 이미 KST) 문자열을 그대로 줄여 보여 준다
+export const formatLocal = (text: string): string => `${text.slice(5, 7)}/${text.slice(8, 10)} ${text.slice(11, 16)}`

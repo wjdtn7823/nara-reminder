@@ -15,16 +15,58 @@ services:
       retries: 10
     restart: unless-stopped
 
-  app:
-    # 운영 VM 은 GitHub Actions 가 빌드한 이미지를 받아 실행하고, 로컬은 build 로 직접 빌드한다
-    image: ghcr.io/wjdtn7823/nara-reminder:latest
-    build: .
-    env_file: .env
+  api:
+    # 화면 API·로그인. 비밀값은 DB 접속 정보와 디스코드 웹훅만 받는다
+    image: ghcr.io/wjdtn7823/nara-reminder-api:latest
+    build:
+      context: .
+      args:
+        MODULE: api
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/nara
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      LEGACY_OWNER_EMAIL: ${LEGACY_OWNER_EMAIL:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      JAVA_TOOL_OPTIONS: -Xmx160m
       TZ: Asia/Seoul
+    healthcheck:
+      # Flyway 마이그레이션이 끝나야 8080 이 열린다
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
     depends_on:
       postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    # 수집·매칭·발송·인증 메일. 외부에 포트를 열지 않는다
+    image: ghcr.io/wjdtn7823/nara-reminder-worker:latest
+    build:
+      context: .
+      args:
+        MODULE: worker
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/nara
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      NARA_SERVICE_KEY: ${NARA_SERVICE_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      JAVA_TOOL_OPTIONS: -Xmx192m
+      TZ: Asia/Seoul
+    depends_on:
+      # 스키마는 api 가 만든다
+      api:
         condition: service_healthy
     restart: unless-stopped
 
@@ -43,7 +85,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - app
+      - api
     restart: unless-stopped
 
 volumes:

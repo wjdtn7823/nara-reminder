@@ -8,6 +8,8 @@ import java.time.Instant
 interface EmailTokenRepository : JpaRepository<EmailToken, Long> {
     fun findByTokenHash(tokenHash: String): EmailToken?
 
+    fun existsByEmailAndPurposeAndCreatedAtAfter(email: String, purpose: TokenPurpose, since: Instant): Boolean
+
     @Modifying
     @Query("delete from EmailToken t where t.usedAt is not null or t.expiresAt < :now")
     fun deleteUsedOrExpired(now: Instant): Int

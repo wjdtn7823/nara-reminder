@@ -1,5 +1,9 @@
-package com.narareminder.job
+package com.narareminder.admin
 
+import com.narareminder.job.JobName
+import com.narareminder.job.JobRun
+import com.narareminder.job.JobRunRepository
+import com.narareminder.job.JobRunStatus
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.domain.Specification
@@ -20,7 +24,7 @@ data class RunPageResponse(
 )
 
 @RestController
-@RequestMapping("/api/runs")
+@RequestMapping("/api/admin/runs")
 class JobRunController(private val repository: JobRunRepository) {
 
     @GetMapping

@@ -8,7 +8,9 @@ plugins {
 dependencies {
     implementation(project(":core"))
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-security")
 
+    testImplementation("org.springframework.security:spring-security-test")
     testImplementation(testFixtures(project(":core")))
     testImplementation("io.mockk:mockk:1.14.5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

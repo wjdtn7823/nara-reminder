@@ -3,19 +3,16 @@ package com.narareminder.auth
 import com.narareminder.PostgresTestConfig
 import com.narareminder.support.authAs
 import com.narareminder.user.AppUserRepository
-import org.junit.jupiter.api.MethodOrderer
-import org.junit.jupiter.api.Order
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestMethodOrder
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
+import jakarta.servlet.http.Cookie
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpSession
 import org.springframework.security.crypto.password.PasswordEncoder
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
-import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
@@ -28,9 +25,6 @@ import java.time.Instant
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Import(PostgresTestConfig::class)
-// csrf() 후처리기는 공용 CsrfFilter 의 저장소를 갈아 끼워 쿠키 검증을 깨뜨리므로, 쿠키 테스트를 먼저 돌리고 컨텍스트를 버린다
-@TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Transactional
 class AuthApiTest @Autowired constructor(
     private val mockMvc: MockMvc,
@@ -41,24 +35,33 @@ class AuthApiTest @Autowired constructor(
     private fun member(email: String = "member@example.com", password: String? = "correct-horse") =
         accountService.create(email, password?.let { passwordEncoder.encode(it) }, admin = false)
 
-    private fun login(email: String, password: String, session: MockHttpSession = MockHttpSession()): ResultActionsDsl =
-        mockMvc.post("/api/auth/login") {
+    // 운영과 같은 경로: GET 으로 XSRF-TOKEN 쿠키를 받아 쿠키와 X-XSRF-TOKEN 헤더로 돌려보낸다
+    private fun xsrfCookie(): Cookie =
+        requireNotNull(mockMvc.get("/api/me").andReturn().response.getCookie("XSRF-TOKEN"))
+
+    private fun login(email: String, password: String, session: MockHttpSession = MockHttpSession()): ResultActionsDsl {
+        val xsrf = xsrfCookie()
+        return mockMvc.post("/api/auth/login") {
             this.session = session
-            with(csrf())
+            cookie(xsrf)
+            header("X-XSRF-TOKEN", xsrf.value)
             contentType = MediaType.APPLICATION_JSON
             content = """{"email":"$email","password":"$password"}"""
         }
+    }
 
     @Test
     fun `로그인하면 세션에 인증이 저장되고 내 정보를 돌려준다`() {
         member()
         val session = MockHttpSession()
+        val before = session.id
 
         login("member@example.com", "correct-horse", session).andExpect {
             status { isOk() }
             jsonPath("$.email") { value("member@example.com") }
             jsonPath("$.admin") { value(false) }
         }
+        assertThat(session.id).isNotEqualTo(before)
         mockMvc.get("/api/me") { this.session = session }.andExpect {
             status { isOk() }
             jsonPath("$.email") { value("member@example.com") }
@@ -101,7 +104,6 @@ class AuthApiTest @Autowired constructor(
     }
 
     @Test
-    @Order(1)
     fun `로그인하지 않으면 401 이고 XSRF-TOKEN 쿠키를 내려준다`() {
         mockMvc.get("/api/me").andExpect {
             status { isUnauthorized() }
@@ -132,9 +134,11 @@ class AuthApiTest @Autowired constructor(
         val session = MockHttpSession()
         login("member@example.com", "correct-horse", session).andExpect { status { isOk() } }
 
+        val xsrf = xsrfCookie()
         mockMvc.post("/api/auth/logout") {
             this.session = session
-            with(csrf())
+            cookie(xsrf)
+            header("X-XSRF-TOKEN", xsrf.value)
         }.andExpect { status { isOk() } }
 
         mockMvc.get("/api/me") { this.session = session }.andExpect { status { isUnauthorized() } }

@@ -18,7 +18,7 @@ class AuthService(
     // 실패 횟수 기록이 롤백되지 않도록 인증 실패 예외는 커밋한다
     @Transactional(noRollbackFor = [InvalidCredentialsException::class, AccountLockedException::class])
     fun authenticate(rawEmail: String, password: String): AppPrincipal {
-        val user = userRepository.findByEmail(rawEmail.trim().lowercase()) ?: throw InvalidCredentialsException()
+        val user = userRepository.findByEmailForUpdate(rawEmail.trim().lowercase()) ?: throw InvalidCredentialsException()
         val now = clock.instant()
         if (user.isLocked(now)) throw AccountLockedException()
         val hash = user.passwordHash

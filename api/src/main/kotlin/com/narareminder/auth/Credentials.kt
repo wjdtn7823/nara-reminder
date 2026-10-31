@@ -10,7 +10,9 @@ fun normalizeEmail(raw: String): String {
     return email
 }
 
-// bcrypt 는 72바이트까지만 쓰므로 그보다 긴 비밀번호는 받지 않는다
+// bcrypt 는 72바이트까지만 쓰므로 글자 수가 아니라 바이트로 상한을 건다
 fun validatePassword(password: String) {
-    if (password.length !in 8..72) throw BadRequestException("INVALID_PASSWORD", "비밀번호는 8~72자여야 합니다")
+    if (password.length < 8 || password.toByteArray(Charsets.UTF_8).size > 72) {
+        throw BadRequestException("INVALID_PASSWORD", "비밀번호는 8자 이상, 72바이트 이하여야 합니다")
+    }
 }

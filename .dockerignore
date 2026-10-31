@@ -1,7 +1,7 @@
 .git
 .gradle
 .kotlin
-build
+**/build
 .env
 .idea
 admin/node_modules

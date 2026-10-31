@@ -28,6 +28,8 @@ class PasswordResetService(
         val user = userRepository.findByEmail(email) ?: return
         if (user.status != UserStatus.ACTIVE) return
         val now = clock.instant()
+        // 재설정 메일로 Gmail 일일 한도가 소진되지 않도록 같은 주소에는 60초에 한 통만 보낸다
+        if (emailTokenRepository.existsByEmailAndPurposeAndCreatedAtAfter(email, TokenPurpose.RESET, now.minus(RESET_THROTTLE))) return
         val token = TokenCodec.newToken()
         emailTokenRepository.save(EmailToken(email, TokenPurpose.RESET, TokenCodec.hash(token), null, null, now.plus(RESET_TTL), now))
         outboxMailRepository.save(authMails.reset(email, token, now))
@@ -46,5 +48,6 @@ class PasswordResetService(
 
     companion object {
         private val RESET_TTL: Duration = Duration.ofMinutes(30)
+        private val RESET_THROTTLE: Duration = Duration.ofSeconds(60)
     }
 }

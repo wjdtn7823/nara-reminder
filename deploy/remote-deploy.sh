@@ -20,7 +20,13 @@ docker compose pull api worker web
 # 분리 전 단일 app 컨테이너가 남아 있으면 이관 중 옛 방식으로 메일을 보내지 않도록 먼저 내린다
 docker ps -aq --filter label=com.docker.compose.service=app | xargs -r docker rm -f > /dev/null
 
-docker compose up -d --no-build --remove-orphans
+# depends_on service_healthy 때문에 up 자체가 api healthy 까지 막히므로, 실패해도 로그를 남기고 끝낸다
+up_started=$(date +%s)
+if ! docker compose up -d --no-build --remove-orphans; then
+  docker compose ps
+  docker compose logs --tail 80 api worker
+  exit 1
+fi
 docker image prune -f > /dev/null
 
 # api 가 마이그레이션을 마치고 healthy 가 될 때까지 기다린다 (최대 3분)
@@ -35,11 +41,19 @@ if [ "$(docker compose ps api --format '{{.Health}}')" != "healthy" ]; then
   docker compose logs --tail 50 api
   exit 1
 fi
-for service in api worker web; do
+for service in api web; do
   if [ "$(docker compose ps "$service" --format '{{.State}}')" != "running" ]; then
     docker compose logs --tail 50 "$service"
     exit 1
   fi
 done
+# worker 는 up 이후 60초 동안 재시작 없이 running 이어야 한다
+elapsed=$(( $(date +%s) - up_started ))
+[ "$elapsed" -lt 60 ] && sleep $(( 60 - elapsed ))
+if [ "$(docker compose ps worker --format '{{.State}}')" != "running" ] \
+  || [ "$(docker inspect -f '{{.RestartCount}}' "$(docker compose ps -q worker)")" != "0" ]; then
+  docker compose logs --tail 80 worker
+  exit 1
+fi
 git log --oneline -1
 echo "DEPLOY_OK"

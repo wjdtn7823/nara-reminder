@@ -21,12 +21,24 @@ const readCookie = (name: string): string | null => {
   return entry ? decodeURIComponent(entry.slice(name.length + 1)) : null
 }
 
+let unauthorizedHandler: (() => void) | null = null
+
+export function onUnauthorized(handler: (() => void) | null) {
+  unauthorizedHandler = handler
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase()
   // 서버가 내려준 XSRF-TOKEN 쿠키를 변경 요청 헤더로 돌려보낸다 (Spring Security CSRF)
-  const csrf = method === 'GET' ? null : readCookie('XSRF-TOKEN')
+  let csrf = method === 'GET' ? null : readCookie('XSRF-TOKEN')
+  if (method !== 'GET' && !csrf) {
+    // 첫 요청이거나 로그아웃으로 쿠키가 지워진 경우: /api/me 응답 상태와 상관없이 쿠키만 받아 온다
+    await fetch('/api/me')
+    csrf = readCookie('XSRF-TOKEN')
+  }
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(csrf ? { 'X-XSRF-TOKEN': csrf } : {}) }
   const response = await fetch(path, { ...init, headers: { ...headers, ...init?.headers } })
+  if (response.status === 401 && !path.startsWith('/api/auth/') && path !== '/api/me') unauthorizedHandler?.()
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null)
     const error = isErrorBody(body) ? body : { code: 'UNKNOWN', message: `요청 실패 (${response.status})` }

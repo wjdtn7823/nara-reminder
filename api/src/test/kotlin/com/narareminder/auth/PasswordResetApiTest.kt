@@ -99,11 +99,25 @@ class PasswordResetApiTest @Autowired constructor(
         reset(token, "new-password").andExpect { status { isNoContent() } }
         reset(token, "other-password").andExpect { jsonPath("$.code") { value("INVALID_TOKEN") } }
 
+        em.flush()
+        jdbc.update("UPDATE email_token SET created_at = now() - interval '2 minutes'")
+        em.clear()
         forgot("member@example.com")
         val late = lastTokenFor("member@example.com")
         em.flush()
         jdbc.update("UPDATE email_token SET expires_at = now() - interval '1 minute' WHERE used_at IS NULL")
         em.clear()
         reset(late, "new-password").andExpect { jsonPath("$.code") { value("INVALID_TOKEN") } }
+    }
+
+    @Test
+    fun `60초 안에 다시 요청하면 메일을 또 만들지 않고 응답은 같다`() {
+        accountService.create("member@example.com", passwordEncoder.encode("old-password"), admin = false)
+        val before = outbox.count()
+
+        forgot("member@example.com").andExpect { status { isAccepted() } }
+        forgot("member@example.com").andExpect { status { isAccepted() } }
+
+        assertThat(outbox.count()).isEqualTo(before + 1)
     }
 }

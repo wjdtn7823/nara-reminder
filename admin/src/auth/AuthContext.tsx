@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { fetchMe } from '../api/auth'
+import { onUnauthorized } from '../api/client'
 import type { Me } from '../types'
 
 interface AuthState {
@@ -21,6 +22,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(setMe)
       .catch(() => setMe(null))
       .finally(() => setLoading(false))
+  }, [])
+
+  // 세션이 중간에 만료되면(재배포 등) 로그인 화면으로 보낸다
+  useEffect(() => {
+    onUnauthorized(() => setMe(null))
+    return () => onUnauthorized(null)
   }, [])
 
   return <AuthContext.Provider value={{ me, loading, setMe }}>{children}</AuthContext.Provider>

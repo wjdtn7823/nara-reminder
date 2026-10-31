@@ -21,12 +21,14 @@ docker compose pull api worker web
 docker ps -aq --filter label=com.docker.compose.service=app | xargs -r docker rm -f > /dev/null
 
 # depends_on service_healthy 때문에 up 자체가 api healthy 까지 막히므로, 실패해도 로그를 남기고 끝낸다
-up_started=$(date +%s)
 if ! docker compose up -d --no-build --remove-orphans; then
   docker compose ps
   docker compose logs --tail 80 api worker
   exit 1
 fi
+# worker 는 api 가 healthy 가 된 뒤에 뜨므로 up 이 끝난 시점부터 60초를 잰다
+worker_started=$(date +%s)
+worker_restarts=$(docker inspect -f '{{.RestartCount}}' "$(docker compose ps -q worker)")
 docker image prune -f > /dev/null
 
 # api 가 마이그레이션을 마치고 healthy 가 될 때까지 기다린다 (최대 3분)
@@ -47,11 +49,11 @@ for service in api web; do
     exit 1
   fi
 done
-# worker 는 up 이후 60초 동안 재시작 없이 running 이어야 한다
-elapsed=$(( $(date +%s) - up_started ))
+# worker 는 60초 동안 재시작 없이 running 이어야 한다 (재생성되지 않은 컨테이너의 과거 재시작 횟수는 제외)
+elapsed=$(( $(date +%s) - worker_started ))
 [ "$elapsed" -lt 60 ] && sleep $(( 60 - elapsed ))
 if [ "$(docker compose ps worker --format '{{.State}}')" != "running" ] \
-  || [ "$(docker inspect -f '{{.RestartCount}}' "$(docker compose ps -q worker)")" != "0" ]; then
+  || [ "$(docker inspect -f '{{.RestartCount}}' "$(docker compose ps -q worker)")" != "$worker_restarts" ]; then
   docker compose logs --tail 80 worker
   exit 1
 fi

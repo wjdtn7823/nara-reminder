@@ -1,5 +1,5 @@
 import { screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, request } from '../api/client'
 import { fetchMe } from '../api/auth'
 import { Header } from '../components/Header'
@@ -25,6 +25,7 @@ const routes = [
 
 describe('RequireAuth / Header', () => {
   beforeEach(() => vi.resetAllMocks())
+  afterEach(() => vi.unstubAllGlobals())
 
   it('로그인하지 않았으면 로그인 화면으로 보낸다', async () => {
     vi.mocked(fetchMe).mockRejectedValue(new ApiError(401, 'UNAUTHORIZED', '로그인 필요'))
@@ -56,6 +57,5 @@ describe('RequireAuth / Header', () => {
     renderRoutes(routes, '/expired')
 
     await waitFor(() => expect(screen.getByText('로그인 화면')).toBeInTheDocument())
-    vi.unstubAllGlobals()
   })
 })

@@ -10,4 +10,7 @@ interface JobRunRepository : JpaRepository<JobRun, Long>, JpaSpecificationExecut
     @Modifying
     @Query("delete from JobRun r where r.startedAt < :cutoff")
     fun deleteByStartedAtBefore(cutoff: Instant): Int
+
+    @Query("select coalesce(sum(r.sentCount), 0) from JobRun r where r.jobName = :job and r.startedAt >= :since")
+    fun sumSentCountSince(job: JobName, since: Instant): Long
 }

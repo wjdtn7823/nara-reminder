@@ -13,6 +13,5 @@ nara:
   service-key: test-key
   mail:
     from: bot@example.com
-    to: me@example.com
   scheduling:
     enabled: false

@@ -9,7 +9,7 @@ fun testProperties(
     bidAlertAfterFailures: Int = 6,
 ) = NaraProperties(
     serviceKey = serviceKey,
-    mail = NaraProperties.Mail(from = "bot@example.com", to = listOf("me@example.com")),
+    mail = NaraProperties.Mail(from = "bot@example.com"),
     bid = NaraProperties.Job(
         overlap = Duration.ofMinutes(30),
         initialLookback = Duration.ofHours(1),

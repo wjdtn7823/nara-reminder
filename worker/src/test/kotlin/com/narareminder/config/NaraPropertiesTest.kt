@@ -11,7 +11,6 @@ class NaraPropertiesTest {
     private val required = mapOf(
         "nara.service-key" to "key",
         "nara.mail.from" to "bot@example.com",
-        "nara.mail.to" to "a@example.com,b@example.com",
         "nara.bid.overlap" to "30m",
         "nara.bid.initial-lookback" to "1h",
         "nara.bid.max-lookback" to "7d",
@@ -31,7 +30,7 @@ class NaraPropertiesTest {
     fun `필수 설정과 기간 표기를 바인딩한다`() {
         val props = bind()
 
-        assertThat(props.mail.to).containsExactly("a@example.com", "b@example.com")
+        assertThat(props.mail.fromName).isEqualTo("나라장터 알림")
         assertThat(props.bid.overlap).isEqualTo(Duration.ofMinutes(30))
         assertThat(props.bid.maxLookback).isEqualTo(Duration.ofDays(7))
         assertThat(props.preSpec.alertAfterFailures).isEqualTo(1)

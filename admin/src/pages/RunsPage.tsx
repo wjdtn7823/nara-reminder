@@ -5,6 +5,12 @@ import { JOB_LABELS, type JobName, type JobRun, type Page, type RunStatus } from
 
 const STATUS_LABELS: Record<RunStatus, string> = { SUCCESS: '성공', FAILURE: '실패' }
 
+// 수집은 조회 → 새 공고 → 매칭(발송 대기 생성), 발송은 보낸 메일·공고 수
+const runCounts = (run: JobRun): string =>
+  run.jobName === 'DELIVERY'
+    ? `메일 ${run.sentCount}통 · 공고 ${run.matchedCount}건`
+    : `조회 ${run.fetchedCount} → 새 공고 ${run.matchedCount} → 매칭 ${run.sentCount}`
+
 export function RunsPage() {
   const [query, setQuery] = useState<RunQuery>({ job: '', status: '', page: 0 })
   const [data, setData] = useState<Page<JobRun> | null>(null)
@@ -28,6 +34,7 @@ export function RunsPage() {
             <option value="">전체</option>
             <option value="BID_POLLING">입찰공고</option>
             <option value="PRE_SPEC_DAILY">사전규격</option>
+            <option value="DELIVERY">메일 발송</option>
           </select>
         </label>
         <label>
@@ -45,7 +52,7 @@ export function RunsPage() {
         <table>
           <thead>
             <tr>
-              <th>시작 (KST)</th><th>작업</th><th>조회 → 통과 → 발송</th><th>상태</th><th>소요</th><th>오류</th>
+              <th>시작 (KST)</th><th>작업</th><th>건수</th><th>상태</th><th>소요</th><th>오류</th>
             </tr>
           </thead>
           <tbody>
@@ -53,7 +60,7 @@ export function RunsPage() {
               <tr key={run.id}>
                 <td>{formatKst(run.startedAt)}</td>
                 <td>{JOB_LABELS[run.jobName]}</td>
-                <td>{`${run.fetchedCount} → ${run.matchedCount} → ${run.sentCount}`}</td>
+                <td>{runCounts(run)}</td>
                 <td><span className={`badge ${run.status.toLowerCase()}`}>{STATUS_LABELS[run.status]}</span></td>
                 <td>{formatDuration(run.startedAt, run.finishedAt)}</td>
                 <td>

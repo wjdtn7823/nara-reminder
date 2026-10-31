@@ -20,10 +20,10 @@ describe('RunsPage', () => {
   it('실행 이력을 KST 와 건수로 보여 준다', async () => {
     vi.mocked(fetchRuns).mockResolvedValue(page([run]))
     render(<RunsPage />)
-    const row = await screen.findByRole('row', { name: /40 → 3 → 0/ })
+    const row = await screen.findByRole('row', { name: /조회 40 → 새 공고 3 → 매칭 0/ })
     expect(within(row).getByText('입찰공고')).toBeInTheDocument()
     expect(within(row).getAllByText(/14:00/).length).toBeGreaterThan(0)
-    expect(within(row).getByText('40 → 3 → 0')).toBeInTheDocument()
+    expect(within(row).getByText('조회 40 → 새 공고 3 → 매칭 0')).toBeInTheDocument()
     expect(within(row).getByText('실패')).toBeInTheDocument()
     expect(within(row).getByText('4초')).toBeInTheDocument()
     expect(within(row).getAllByText(/SMTP 오류/).length).toBeGreaterThan(0)
@@ -32,7 +32,7 @@ describe('RunsPage', () => {
   it('배치 동작 확인용이라 조회 구간은 보여 주지 않는다', async () => {
     vi.mocked(fetchRuns).mockResolvedValue(page([run]))
     render(<RunsPage />)
-    const row = await screen.findByRole('row', { name: /40 → 3 → 0/ })
+    const row = await screen.findByRole('row', { name: /조회 40 → 새 공고 3 → 매칭 0/ })
     expect(screen.queryByRole('columnheader', { name: '조회 구간' })).not.toBeInTheDocument()
     expect(within(row).queryByText(/13:25/)).not.toBeInTheDocument()
   })
@@ -40,10 +40,18 @@ describe('RunsPage', () => {
   it('작업을 바꾸면 첫 페이지부터 다시 조회한다', async () => {
     vi.mocked(fetchRuns).mockResolvedValue(page([run], 3))
     render(<RunsPage />)
-    await screen.findByRole('row', { name: /40 → 3 → 0/ })
+    await screen.findByRole('row', { name: /조회 40 → 새 공고 3 → 매칭 0/ })
     await userEvent.click(screen.getByRole('button', { name: '다음' }))
     await userEvent.selectOptions(screen.getByLabelText('작업'), 'PRE_SPEC_DAILY')
     expect(fetchRuns).toHaveBeenLastCalledWith({ job: 'PRE_SPEC_DAILY', status: '', page: 0 })
+  })
+
+  it('메일 발송 실행은 보낸 메일 수와 공고 수로 보여 준다', async () => {
+    vi.mocked(fetchRuns).mockResolvedValue(page([{ ...run, id: 2, jobName: 'DELIVERY', fetchedCount: 0, matchedCount: 5, sentCount: 3, status: 'SUCCESS', error: null }]))
+    render(<RunsPage />)
+
+    const row = await screen.findByRole('row', { name: /메일 3통 · 공고 5건/ })
+    expect(within(row).getByText('메일 발송')).toBeInTheDocument()
   })
 
   it('이력이 없으면 안내를 보여 준다', async () => {

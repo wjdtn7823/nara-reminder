@@ -48,3 +48,8 @@ export interface Page<T> {
 export const CATEGORIES: Category[] = ['GOODS', 'SERVICE', 'CONSTRUCTION', 'FOREIGN']
 export const CATEGORY_LABELS: Record<Category, string> = { GOODS: '물품', SERVICE: '용역', CONSTRUCTION: '공사', FOREIGN: '외자' }
 export const JOB_LABELS: Record<JobName, string> = { BID_POLLING: '입찰공고', PRE_SPEC_DAILY: '사전규격' }
+
+export interface CronPreview {
+  cron: string
+  next: string[]
+}

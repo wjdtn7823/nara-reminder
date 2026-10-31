@@ -175,3 +175,25 @@ nav button {
   background: #fef3c7;
   color: #92400e;
 }
+
+.cadence fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.cadence legend {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.cadence button[aria-pressed='true'] {
+  background: #2563eb;
+  color: #fff;
+}
+
+.cadence-summary {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 12px;
+}

@@ -27,9 +27,9 @@ class MailNotifier(
     }
 
     fun sendAlert(job: JobName, consecutiveFailures: Int, lastSuccessAt: Instant?, error: String) {
-        val subject = "[나라장터 알림 서버] ${job.source.label} 수집 실패 (${consecutiveFailures}회 연속)"
+        val subject = "[나라장터 알림 서버] ${job.label} 실패 (${consecutiveFailures}회 연속)"
         val html = """
-            <p>작업: ${job.source.label}</p>
+            <p>작업: ${job.label}</p>
             <p>연속 실패: ${consecutiveFailures}회</p>
             <p>마지막 성공: ${lastSuccessAt?.atZone(KST)?.format(DISPLAY_DATE_TIME) ?: "없음"}</p>
             <pre>${escape(error)}</pre>

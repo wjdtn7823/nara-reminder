@@ -16,7 +16,7 @@ class DiscordNotifier(props: NaraProperties) {
     fun sendAlert(job: JobName, consecutiveFailures: Int, lastSuccessAt: Instant?, error: String): Boolean {
         val hook = webhook ?: return false
         hook.send(
-            "🚨 **[나라장터 알림 서버] ${job.source.label} 수집 실패 (${consecutiveFailures}회 연속)**\n" +
+            "🚨 **[나라장터 알림 서버] ${job.label} 실패 (${consecutiveFailures}회 연속)**\n" +
                 "마지막 성공: ${lastSuccessAt?.atZone(KST)?.format(DISPLAY_DATE_TIME) ?: "없음"}\n" +
                 "```\n$error\n```",
         )

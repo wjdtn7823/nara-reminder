@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /admin
+    schedule:
+      interval: weekly
+    # 버전 업데이트 PR 은 만들지 않는다. 보안 업데이트에는 이 값이 적용되지 않는다
+    open-pull-requests-limit: 0
+    groups:
+      # vite·vitest 처럼 peer 범위가 묶인 패키지를 따로 올리면 npm ci 가 ERESOLVE 로 실패한다
+      admin-security:
+        applies-to: security-updates
+        patterns:
+          - "*"

@@ -22,17 +22,18 @@ gh pr view <N> --json number,headRefName,baseRefName,isCrossRepository,headRefOi
 gh pr checks <N>
 ```
 
-`isCrossRepository` 가 true 면 멈추고 알린다. 리뷰는 파일로 받아 필요한 부분만 읽는다.
+`isCrossRepository` 가 true 면 멈추고 알린다. 리뷰는 저장소 밖 임시 디렉터리에 파일로 받아 필요한 부분만 읽는다.
 
 ```bash
+TMP=$(mktemp -d)
 # 리뷰 본문(Nitpick 등 스레드가 없는 지적이 여기 있다)
 gh api "repos/$REPO/pulls/<N>/reviews" --paginate \
-  --jq '.[] | select(.user.login=="coderabbitai[bot]") | {id, commit_id, body}' > reviews.json
+  --jq '.[] | select(.user.login=="coderabbitai[bot]") | {id, commit_id, body}' > "$TMP/reviews.json"
 # 미해결 인라인 스레드
 gh api graphql -F owner=${REPO%/*} -F name=${REPO#*/} -F pr=<N> -f query='
 query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   reviewThreads(first:100){nodes{id isResolved isOutdated path line
-    comments(first:20){nodes{databaseId author{login} body}}}}}}}' > threads.json
+    comments(first:20){nodes{databaseId author{login} body}}}}}}}' > "$TMP/threads.json"
 ```
 
 처리 대상은 `isResolved` 가 false 이고 첫 댓글 작성자가 `coderabbitai` 이며, 그 뒤에 사람이 단 답글이 없는 스레드다. 대상이 없으면 "새 지적 없음"만 알리고 끝낸다.

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component
 @Component
 class NoticeJobs(private val pipeline: NoticePipeline) {
 
-    @Scheduled(fixedDelayString = "\${nara.bid.poll-interval}", initialDelayString = "PT10S")
+    @Scheduled(cron = "\${nara.bid.cron}", zone = "Asia/Seoul")
     suspend fun pollBids() {
         pipeline.run(JobName.BID_POLLING)
     }

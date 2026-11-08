@@ -34,11 +34,11 @@ nara:
     from: ${MAIL_FROM}
     to: ${MAIL_TO}
   bid:
-    poll-interval: PT5M
+    cron: "0 0 8 * * *"
     overlap: 30m
-    initial-lookback: 1h
+    initial-lookback: 24h
     max-lookback: 7d
-    alert-after-failures: 6
+    alert-after-failures: 1
   pre-spec:
     cron: "0 0 8 * * *"
     overlap: 1h

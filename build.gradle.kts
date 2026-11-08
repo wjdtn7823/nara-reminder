@@ -20,6 +20,9 @@ repositories {
     mavenCentral()
 }
 
+// Boot 3.5.6 기본값 1.21.3 은 GitHub ubuntu-26.04 러너의 Docker 에 연결하지 못한다
+extra["testcontainers.version"] = "1.21.4"
+
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-webflux")

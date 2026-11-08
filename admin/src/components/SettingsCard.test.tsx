@@ -42,7 +42,7 @@ describe('SettingsCard', () => {
     await userEvent.type(screen.getByLabelText('최소 가격'), '1000')
     await userEvent.click(screen.getByRole('button', { name: '저장' }))
     expect(updateSettings).toHaveBeenCalledWith({ categories: ['GOODS', 'SERVICE', 'FOREIGN'], priceMin: 1000, priceMax: null })
-    expect(await screen.findByRole('status')).toHaveTextContent('다음 수집(매일 08:00)부터 적용됩니다')
+    expect(await screen.findByRole('status')).toHaveTextContent('다음 수집부터 적용됩니다')
     expect(onSaved).toHaveBeenCalledWith(response)
   })
 })

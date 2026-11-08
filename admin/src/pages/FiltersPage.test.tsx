@@ -33,7 +33,7 @@ describe('FiltersPage', () => {
     render(<FiltersPage />)
     await userEvent.click(await screen.findByLabelText('물품'))
     await userEvent.click(screen.getByRole('button', { name: '저장' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('다음 수집(최대 5분)부터 적용됩니다')
+    expect(await screen.findByRole('status')).toHaveTextContent('다음 수집(매일 08:00)부터 적용됩니다')
     expect(fetchFilters).toHaveBeenCalledTimes(1)
   })
 })

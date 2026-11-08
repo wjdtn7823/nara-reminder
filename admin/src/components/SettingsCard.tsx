@@ -75,7 +75,7 @@ export function SettingsCard({ categories, priceMin, priceMax, onSaved }: Settin
           {error}
         </p>
       )}
-      {saved && <p role="status">다음 수집(최대 5분)부터 적용됩니다</p>}
+      {saved && <p role="status">다음 수집(매일 08:00)부터 적용됩니다</p>}
     </section>
   )
 }
